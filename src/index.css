@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap');
+@import 'tailwindcss';
+
+/* Tokens del sistema de diseño "pizarra táctica + parquet + scoreboard de estadio"
+   (ver Claude Design, resumido en CLAUDE.md). */
+@theme {
+  --color-fondo: #0d0d0d;
+  --color-superficie: #1a1512;
+  --color-superficie-alta: #241d17;
+  --color-acento: #ff6b1a;
+  --color-hueso: #f5f1e8;
+  --color-en-vivo: #4ade80;
+
+  --font-marcador: 'Bebas Neue', sans-serif;
+  --font-titulo: 'Oswald', sans-serif;
+  --font-mono-stats: 'Roboto Mono', monospace;
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-hueso);
+  font-family: var(--font-titulo);
+}
+
+::selection {
+  background: var(--color-acento);
+  color: var(--color-fondo);
+}
+
+/* Sombra sólida offset, sin blur — reemplaza cualquier tentación de box-shadow difuso */
+.sombra-brutal {
+  box-shadow: 6px 6px 0 var(--color-hueso);
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
+}
+.sombra-brutal:active {
+  box-shadow: 3px 3px 0 var(--color-hueso);
+  transform: translate(3px, 3px);
+}
+
+/* Línea de jugada — trazo cortado horizontal, usado como separador de sección */
+.linea-jugada {
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(245, 241, 232, 0.45) 0 10px,
+    transparent 10px 20px
+  );
+}
+
+/* Textura de parquet — banda de fondo para headers de marcador/hero */
+.textura-parquet {
+  position: relative;
+}
+.textura-parquet::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image: repeating-linear-gradient(90deg, #2a1d12 0 8px, #1f1409 8px 16px);
+  pointer-events: none;
+}
+
+/* Animación real de cambio de temporada — el número de OVR "pega un salto" al entrar,
+   nada de transiciones apagadas. Se dispara de nuevo remontando el elemento (key distinta
+   por temporada) en el componente. */
+@keyframes ovr-pop {
+  0% {
+    transform: scale(0.75);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animar-ovr {
+  animation: ovr-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes chip-entrada {
+  0% {
+    transform: translateY(-6px) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.animar-chip {
+  animation: chip-entrada 0.3s ease-out;
+}
+
+/* ===== Animaciones del sistema de diseño "con animaciones" (Claude Design) ===== */
+@keyframes ball-flight {
+  0% { bottom: 26px; left: 50%; transform: translateX(-50%) rotate(0deg) scale(1); }
+  38% { bottom: 172px; left: 41%; transform: translateX(-50%) rotate(340deg) scale(0.86); }
+  68% { bottom: 246px; left: 52%; transform: translateX(-50%) rotate(560deg) scale(0.66); }
+  86% { bottom: 232px; left: 50%; transform: translateX(-50%) rotate(650deg) scale(0.58); }
+  100% { bottom: 214px; left: 50%; transform: translateX(-50%) rotate(700deg) scale(0.5); opacity: 0; }
+}
+@keyframes net-wobble {
+  0% { transform: scaleY(1) skewX(0deg); }
+  26% { transform: scaleY(0.8) skewX(7deg); }
+  55% { transform: scaleY(1.08) skewX(-5deg); }
+  80% { transform: scaleY(0.95) skewX(2deg); }
+  100% { transform: scaleY(1) skewX(0deg); }
+}
+@keyframes rim-flash {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.6); }
+  30% { opacity: 0.9; transform: translateX(-50%) scale(1.2); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.7); }
+}
+@keyframes swish-pop {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.8); }
+  28% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  72% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -16px) scale(1); }
+}
+@keyframes ball-bounce-idle {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  50% { transform: translateX(-50%) translateY(-13px) rotate(14deg); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 6px 6px 0 var(--color-hueso), 0 0 0 rgba(255, 107, 26, 0); }
+  50% { box-shadow: 6px 6px 0 var(--color-hueso), 0 0 24px rgba(255, 107, 26, 0.55); }
+}
+.animar-glow-pulse {
+  animation: glow-pulse 2.4s ease-in-out infinite;
+}
+@keyframes trophy-in {
+  0% { opacity: 0; transform: scale(0.4) rotate(-10deg); }
+  62% { opacity: 1; transform: scale(1.1) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.animar-trofeo {
+  animation: trophy-in 500ms cubic-bezier(0.3, 0.9, 0.4, 1.2) both;
+}
+@keyframes settle-bounce {
+  0% { opacity: 0; transform: scale(0.3); }
+  55% { opacity: 1; transform: scale(1.14); }
+  78% { transform: scale(0.93); }
+  100% { transform: scale(1); }
+}
+.animar-settle {
+  animation: settle-bounce 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes delta-pop {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+  75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -68%) scale(1); }
+}
+.animar-delta {
+  animation: delta-pop 1.6s ease-out forwards;
+}
+
+/* Grano sutil — ruido de fondo, no plano perfecto */
+.textura-grano {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
