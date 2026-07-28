@@ -13,7 +13,7 @@ import { generarCrecimientoPorTraspaso } from './crecimientoPorTraspaso'
 import { INTERVALO_TEMPORADAS_POR_DIFICULTAD, UMBRAL_DRAFT_OVR, type DificultadCarrera } from './caminosPreNba'
 import { LIGAS_POR_PAIS } from './datos/ligasPorPais'
 import { EQUIPOS_CAMINO_GENERICO } from './datos/equiposCaminoGenerico'
-import { calcularEstadisticasTemporada, type EstadisticasTemporada } from './estadisticas'
+import { calcularEstadisticasTemporada, type EstadisticasTemporada, type Rol } from './estadisticas'
 import { evaluarTrofeosTemporada, TROFEOS_INICIALES, type Trofeos } from './trofeos'
 import { generarDecisionRiesgo, type DecisionRiesgo } from './decisionesRiesgo'
 import {
@@ -59,7 +59,7 @@ export interface EntradaHistorial extends EstadisticasTemporada {
 export interface ResultadoRiesgo {
   titulo: string
   texto: string
-  delta: number
+  rol: Rol
 }
 
 // Resumen de cómo le fue al equipo en la temporada regular NBA recién jugada, y en
@@ -88,6 +88,9 @@ export interface Carrera {
   poolPreNba: Equipo[] // clubes/universidades disponibles antes del Draft — liga doméstica o camino genérico
   clubActual: Equipo | null
   especializacion: TipoEspecializacion | null
+  // Última "competencia por el puesto" resuelta (ver decisionesRiesgo.ts) — se limpia al
+  // firmar por un club nuevo (plantel nuevo, terreno neutro otra vez).
+  rolForzado: Rol | null
   eventoPendiente: EventoPendiente | null
   historial: EntradaHistorial[]
   trofeos: Trofeos
@@ -129,6 +132,7 @@ export function crearCarrera(
     poolPreNba,
     clubActual: null,
     especializacion: null,
+    rolForzado: null,
     eventoPendiente: { tipo: 'club-liga-domestica', opciones: elegirEquiposOfrecidos(poolPreNba, ovr, azar) },
     historial: [],
     trofeos: TROFEOS_INICIALES,
@@ -139,13 +143,17 @@ export function crearCarrera(
   }
 }
 
-export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar): Carrera {
+// Resuelve la decisión pendiente y ENCADENA directo a la próxima (jugando copero.com.ar
+// en vivo: ahí no hay pantalla intermedia de "seguir jugando" entre decisiones — se
+// resuelve y ya te muestra la siguiente). `equiposNba` hace falta acá (no solo en
+// avanzarSiCorresponde) porque el encadenado puede terminar generando un trade/draft NBA.
+export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equiposNba: Equipo[]): Carrera {
   if (!carrera.eventoPendiente) return carrera
 
   if (carrera.eventoPendiente.tipo === 'especializacion') {
     const opcion = OPCIONES_ESPECIALIZACION.find((o) => o.id === opcionId)
     if (!opcion) return carrera
-    return { ...carrera, especializacion: opcion.id, eventoPendiente: null }
+    return avanzarSiCorresponde({ ...carrera, especializacion: opcion.id, eventoPendiente: null }, equiposNba, azar)
   }
 
   // La jugada final de la Final de playoffs — resuelve el partido decisivo (2-1) y, como
@@ -157,70 +165,101 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar): Ca
     const gano = resolverJugadaFinal(opcionId, azar)
     const resumenBase = carrera.resumenTemporada ?? { victorias: 0, derrotas: 0, clasifico: true }
     if (gano) {
-      return {
+      return avanzarSiCorresponde(
+        {
+          ...carrera,
+          trofeos: { ...carrera.trofeos, anillos: carrera.trofeos.anillos + 1 },
+          resumenTemporada: { ...resumenBase, campeon: true },
+          eventoPendiente: null,
+          estadoPlayoffsPendiente: null,
+        },
+        equiposNba,
+        azar,
+      )
+    }
+    return avanzarSiCorresponde(
+      {
         ...carrera,
-        trofeos: { ...carrera.trofeos, anillos: carrera.trofeos.anillos + 1 },
-        resumenTemporada: { ...resumenBase, campeon: true },
+        resumenTemporada: {
+          ...resumenBase,
+          eliminado: { ronda: estado.ronda, rival: estado.rival, marcador: '1-2' },
+        },
         eventoPendiente: null,
         estadoPlayoffsPendiente: null,
-      }
-    }
-    return {
-      ...carrera,
-      resumenTemporada: {
-        ...resumenBase,
-        eliminado: { ronda: estado.ronda, rival: estado.rival, marcador: '1-2' },
       },
-      eventoPendiente: null,
-      estadoPlayoffsPendiente: null,
-    }
+      equiposNba,
+      azar,
+    )
   }
 
+  // Decisión de riesgo — rehecha jugando Copero: NO mueve el OVR directo, cambia el ROL
+  // (titular/rotación), que después modula cuánto crecés en tu próximo fichaje (ver
+  // crecimientoPorTraspaso.ts) y tus estadísticas mientras tanto (ver estadisticas.ts).
   if (carrera.eventoPendiente.tipo === 'riesgo') {
     const decision = carrera.eventoPendiente.decision
     if (opcionId === 'seguro') {
-      return {
-        ...carrera,
-        eventoPendiente: null,
-        ultimoResultadoRiesgo: { titulo: decision.titulo, texto: 'Elegiste no arriesgar.', delta: 0 },
-      }
+      return avanzarSiCorresponde(
+        {
+          ...carrera,
+          rolForzado: 'rotacion',
+          eventoPendiente: null,
+          ultimoResultadoRiesgo: { titulo: decision.titulo, texto: 'Aceptaste un lugar en rotación.', rol: 'rotacion' },
+        },
+        equiposNba,
+        azar,
+      )
     }
     if (opcionId === 'arriesgar') {
-      const delta = decision.exito ? decision.deltaSiExito : decision.deltaSiFalla
-      const jugador = { ...carrera.jugador, ovr: clampOvr(carrera.jugador.ovr + delta, carrera.jugador.potencial) }
-      return {
-        ...carrera,
-        jugador,
-        eventoPendiente: null,
-        ultimoResultadoRiesgo: {
-          titulo: decision.titulo,
-          texto: decision.exito ? 'Salió bien.' : 'Salió mal.',
-          delta,
+      const rol: Rol = decision.exito ? 'titular' : 'rotacion'
+      return avanzarSiCorresponde(
+        {
+          ...carrera,
+          rolForzado: rol,
+          eventoPendiente: null,
+          ultimoResultadoRiesgo: {
+            titulo: decision.titulo,
+            texto: decision.exito ? 'Ganaste la titularidad.' : 'Perdiste terreno en el equipo.',
+            rol,
+          },
         },
-      }
+        equiposNba,
+        azar,
+      )
     }
     return carrera
   }
 
-  // 'club-liga-domestica', 'draft' o 'trade': todos ofrecen equipos reales.
-  // Elegir equipo (incluso "quedarte") sube el OVR de forma azarosa — verificado
-  // jugando Copero: cada selección resuelve la temporada y mueve el nivel del jugador.
+  // 'club-liga-domestica', 'draft' o 'trade': todos ofrecen equipos reales. El crecimiento
+  // de OVR sale de acá — un club bien por encima de tu nivel actual da un salto grande, uno
+  // similar o más chico da un salto chico (ver crecimientoPorTraspaso.ts). El rol forzado
+  // se resetea: plantel nuevo, terreno neutro otra vez.
   const equipo = carrera.eventoPendiente.opciones.find((e) => e.id === opcionId)
   if (!equipo) return carrera
 
   // En el Draft, elegir la opción de "quedarte" (tu club actual) declina por ahora —
   // seguís en pre-nba, el Draft vuelve a aparecer la próxima vez que cruces el umbral.
   const pasaANba = carrera.eventoPendiente.tipo === 'draft' && equipo.id !== carrera.clubActual?.id
-  const crecimiento = generarCrecimientoPorTraspaso(azar)
+  const crecimiento = generarCrecimientoPorTraspaso(
+    carrera.jugador.ovr,
+    equipo.nivel,
+    carrera.intervaloTemporadas,
+    carrera.rolForzado,
+    azar,
+  )
   const jugador = { ...carrera.jugador, ovr: clampOvr(carrera.jugador.ovr + crecimiento, carrera.jugador.potencial) }
 
-  return {
-    ...carrera,
-    jugador,
-    clubActual: equipo,
-    fase: pasaANba ? 'nba' : carrera.fase,
-    eventoPendiente: null,
-  }
+  return avanzarSiCorresponde(
+    {
+      ...carrera,
+      jugador,
+      clubActual: equipo,
+      rolForzado: null,
+      fase: pasaANba ? 'nba' : carrera.fase,
+      eventoPendiente: null,
+    },
+    equiposNba,
+    azar,
+  )
 }
 
 export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], azar: Azar): Carrera {
@@ -236,7 +275,13 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
     const jugadorAnterior = jugador
     jugador = avanzarTemporada(jugador, azar)
 
-    const estadisticas = calcularEstadisticasTemporada(jugadorAnterior.ovr, nivelClub, carrera.fase, carrera.especializacion)
+    const estadisticas = calcularEstadisticasTemporada(
+      jugadorAnterior.ovr,
+      nivelClub,
+      carrera.fase,
+      carrera.especializacion,
+      carrera.rolForzado,
+    )
     historial.push({
       edad: jugadorAnterior.edad,
       ovr: jugadorAnterior.ovr,

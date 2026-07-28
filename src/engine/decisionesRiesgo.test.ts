@@ -17,11 +17,11 @@ describe('generarDecisionRiesgo', () => {
     expect(decision.exito).toBe(false)
   })
 
-  it('siempre tiene delta positivo si sale bien y negativo si sale mal', () => {
+  it('siempre trae una probabilidad de éxito entre 0 y 1', () => {
     for (let i = 0; i < 50; i++) {
       const decision = generarDecisionRiesgo(Math.random)
-      expect(decision.deltaSiExito).toBeGreaterThan(0)
-      expect(decision.deltaSiFalla).toBeLessThan(0)
+      expect(decision.probabilidadExito).toBeGreaterThan(0)
+      expect(decision.probabilidadExito).toBeLessThan(1)
     }
   })
 

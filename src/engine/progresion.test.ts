@@ -6,9 +6,9 @@ function azarFijo(valor: number): () => number {
 }
 
 describe('avanzarTemporada', () => {
-  it('sube OVR en edad joven (19-23) si no llegó al potencial', () => {
+  it('en edad joven/pico (hasta 31) no hay crecimiento pasivo — eso sale de fichar/prestamos', () => {
     const resultado = avanzarTemporada({ ovr: 50, edad: 20, potencial: 80 }, azarFijo(0.5))
-    expect(resultado.ovr).toBeGreaterThan(50)
+    expect(resultado.ovr).toBe(50)
   })
 
   it('nunca supera el potencial oculto', () => {
@@ -36,14 +36,13 @@ describe('avanzarTemporada', () => {
     expect(resultado.edad).toBe(21)
   })
 
-  it('en el pico (27-29) todavía puede crecer un poco, no es una meseta chata', () => {
+  it('en el pico (27-29) tampoco hay crecimiento pasivo — sigue sin cambios', () => {
     const resultado = avanzarTemporada({ ovr: 75, edad: 29, potencial: 90 }, azarFijo(0.99))
-    expect(resultado.ovr).toBeGreaterThan(75)
-    expect(resultado.ovr - 75).toBeLessThanOrEqual(3)
+    expect(resultado.ovr).toBe(75)
   })
 
-  it('el declive recién empieza en serio a los 30, no antes', () => {
-    const resultado = avanzarTemporada({ ovr: 75, edad: 30, potencial: 90 }, azarFijo(0.99))
-    expect(resultado.ovr).toBeLessThanOrEqual(76)
+  it('el declive recién empieza en serio a los 32, no antes', () => {
+    const sinDeclive = avanzarTemporada({ ovr: 75, edad: 31, potencial: 90 }, azarFijo(0.99))
+    expect(sinDeclive.ovr).toBe(75)
   })
 })

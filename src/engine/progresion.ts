@@ -19,18 +19,17 @@ interface RangoDelta {
   max: number
 }
 
-// Curva rebalanceada (pedido del usuario: "el cálculo de OVR anda medio flojo" — con la
-// curva anterior la mayoría de las carreras pegaban el techo de potencial en 3-4
-// temporadas y después quedaban 15+ años estancadas/declinando sin nada que jugar). Ahora
-// el crecimiento se reparte en más temporadas (19-26, en vez de solo 19-23) con un pico
-// real 27-29 que todavía puede subir un poco, no una meseta chata — el declive recién
-// empieza en serio a los 30, y se acelera de a poco en vez de un salto brusco a los 32.
+// Curva rehecha jugando copero.com.ar/juegos/simulador-carrera en vivo (pedido explícito
+// del usuario, confirmado con preguntas): en el juego real el crecimiento sale casi
+// entero de fichar/préstamo (ver crecimientoPorTraspaso.ts), no de una curva de edad
+// corriendo temporada a temporada por su cuenta. Acá solo queda el DECLIVE pasivo de
+// veterano — pasa igual aunque no cambies de club — porque un jugador de 35 años
+// declina exista o no una decisión ese año; el crecimiento en edad joven/pico es 0 a
+// propósito, así el único lugar donde de verdad subís de nivel es eligiendo bien tu club.
 function rangoPorEdad(edad: number): RangoDelta {
-  if (edad <= 22) return { min: 2, max: 5 }
-  if (edad <= 26) return { min: 2, max: 6 }
-  if (edad <= 29) return { min: 0, max: 3 }
-  if (edad <= 33) return { min: -2, max: 1 }
-  if (edad <= 36) return { min: -4, max: -1 }
+  if (edad <= 31) return { min: 0, max: 0 }
+  if (edad <= 34) return { min: -2, max: 0 }
+  if (edad <= 37) return { min: -4, max: -1 }
   return { min: -7, max: -3 }
 }
 

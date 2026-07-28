@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { crearCarrera, elegirOpcion, avanzarSiCorresponde, type Carrera } from './engine/motorCarrera'
+import { crearCarrera, elegirOpcion, type Carrera } from './engine/motorCarrera'
 import { EQUIPOS_NBA } from './engine/datos/equiposNba'
 import { PantallaSetupWizard } from './ui/PantallaSetupWizard'
 import type { DatosSetup } from './ui/tiposSetup'
-import { PantallaEvento } from './ui/PantallaEvento'
-import { PantallaProgreso } from './ui/PantallaProgreso'
+import { PantallaCarrera } from './ui/PantallaCarrera'
 import { PantallaRetiro } from './ui/PantallaRetiro'
 
-type Pantalla = 'setup' | 'evento' | 'progreso' | 'retiro'
+type Pantalla = 'setup' | 'carrera' | 'retiro'
 
 function App() {
   const [pantalla, setPantalla] = useState<Pantalla>('setup')
@@ -21,24 +20,17 @@ function App() {
     })
     setNombreCompleto(datos.apellido)
     setCarrera(nueva)
-    setPantalla('evento')
+    setPantalla('carrera')
   }
 
+  // Resuelve la decisión y encadena directo a la próxima (ver motorCarrera.ts) — no hace
+  // falta un paso "seguir jugando" separado, elegirOpcion ya deja la carrera lista con el
+  // próximo evento pendiente o retirada.
   function elegir(opcionId: string) {
     if (!carrera) return
-    setCarrera(elegirOpcion(carrera, opcionId, Math.random))
-    setPantalla('progreso')
-  }
-
-  function seguirJugando() {
-    if (!carrera) return
-    const siguiente = avanzarSiCorresponde(carrera, EQUIPOS_NBA, Math.random)
+    const siguiente = elegirOpcion(carrera, opcionId, Math.random, EQUIPOS_NBA)
     setCarrera(siguiente)
-    if (siguiente.retirado) {
-      setPantalla('retiro')
-    } else if (siguiente.eventoPendiente) {
-      setPantalla('evento')
-    }
+    if (siguiente.retirado) setPantalla('retiro')
   }
 
   function nuevaCarrera() {
@@ -50,10 +42,7 @@ function App() {
     <main className="min-h-screen bg-fondo px-4 py-10 text-hueso">
       <div className="textura-grano" />
       {pantalla === 'setup' && <PantallaSetupWizard onEmpezar={empezarCarrera} />}
-      {pantalla === 'evento' && carrera && <PantallaEvento carrera={carrera} onElegir={elegir} />}
-      {pantalla === 'progreso' && carrera && (
-        <PantallaProgreso carrera={carrera} onSeguirJugando={seguirJugando} />
-      )}
+      {pantalla === 'carrera' && carrera && <PantallaCarrera carrera={carrera} onElegir={elegir} />}
       {pantalla === 'retiro' && carrera && (
         <PantallaRetiro carrera={carrera} nombreCompleto={nombreCompleto} onNuevaCarrera={nuevaCarrera} />
       )}

@@ -42,8 +42,12 @@ export function calcularEstadisticasTemporada(
   nivelClub: number | null,
   fase: 'pre-nba' | 'nba',
   especializacion: TipoEspecializacion | null = null,
+  rolForzado: Rol | null = null,
 ): EstadisticasTemporada {
-  const rol = rolSegunNivelClub(ovr, nivelClub)
+  // El rol forzado (última "competencia por el puesto" ganada/perdida, ver
+  // decisionesRiesgo.ts) pisa el cálculo automático por nivel — es literalmente el rol que
+  // el jugador se ganó o perdió, no una estimación.
+  const rol = rolForzado ?? rolSegunNivelClub(ovr, nivelClub)
   const minutos = MINUTOS_POR_ROL[rol]
   const pj = fase === 'nba' ? PARTIDOS_POR_TEMPORADA_NBA : PARTIDOS_POR_TEMPORADA_OTRAS
 

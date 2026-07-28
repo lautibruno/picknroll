@@ -12,6 +12,7 @@ function carreraBase(overrides: Partial<Carrera>): Carrera {
     poolPreNba: [],
     clubActual: null,
     especializacion: null,
+    rolForzado: null,
     eventoPendiente: null,
     historial: [],
     trofeos: { anillos: 0, allStar: 0, mvp: 0 },
