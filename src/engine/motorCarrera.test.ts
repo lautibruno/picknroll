@@ -373,4 +373,27 @@ describe('motorCarrera', () => {
     expect(carrera.trofeos.anillos).toBe(anillosPrevios)
     expect(carrera.estadoPlayoffsPendiente).toBeNull()
   })
+
+  it('ultimoCambioOvr refleja el crecimiento real de fichar un club top, no un número que después no se cumple', () => {
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
+    carrera = {
+      ...carrera,
+      jugador: { ...carrera.jugador, ovr: 50, potencial: 95 },
+      ovrAlIniciarDecision: 50,
+      eventoPendiente: { tipo: 'club-liga-domestica', opciones: [{ id: 'top', nombre: 'Top Club', nivel: 95 }] },
+    }
+    carrera = elegirOpcion(carrera, 'top', azarFijo(0.5), EQUIPOS_NBA)
+    // El OVR mostrado en la próxima decisión debe coincidir EXACTO con lo que dice el
+    // cambio — no un número prometido que después "sigue en 50" (bug real reportado).
+    expect(carrera.jugador.ovr).toBe(50 + carrera.ultimoCambioOvr)
+    expect(carrera.ultimoCambioOvr).toBeGreaterThan(0)
+  })
+
+  it('ultimoCambioOvr da 0 si la decisión de riesgo no mueve el OVR directo', () => {
+    let carrera = llegarANba('intensa', azarFijo(0.1))
+    expect(carrera.eventoPendiente?.tipo).toBe('riesgo')
+    carrera = elegirOpcion(carrera, 'seguro', azarFijo(0.5), EQUIPOS_NBA)
+    expect(carrera.ultimoCambioOvr).toBe(0)
+  })
 })

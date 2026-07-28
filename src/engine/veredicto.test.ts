@@ -19,6 +19,8 @@ function carreraBase(overrides: Partial<Carrera>): Carrera {
     ultimoResultadoRiesgo: null,
     resumenTemporada: null,
     estadoPlayoffsPendiente: null,
+    ovrAlIniciarDecision: 50,
+    ultimoCambioOvr: 0,
     retirado: true,
     ...overrides,
   }

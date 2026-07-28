@@ -37,8 +37,11 @@ const EDAD_INICIAL = 19
 const EDAD_RETIRO = 40
 const OVR_INICIAL_MIN = 40
 const OVR_INICIAL_MAX = 50
-const PROBABILIDAD_EVENTO_RIESGO_EN_NBA = 0.5
-const PROBABILIDAD_EVENTO_RIESGO_PRE_NBA = 0.5
+// Probabilidad bajada (pedido explícito del usuario: "sigue muy lleno de decisiones de
+// titular/rotación y otras decisiones") — la mayoría de los turnos ahora son ofertas de
+// club simples, la competencia por el puesto es la excepción, no la mitad de las veces.
+const PROBABILIDAD_EVENTO_RIESGO_EN_NBA = 0.22
+const PROBABILIDAD_EVENTO_RIESGO_PRE_NBA = 0.2
 
 export type ModoCaminoPreNba = 'liga-domestica' | 'universidad'
 
@@ -97,6 +100,13 @@ export interface Carrera {
   ultimoResultadoRiesgo: ResultadoRiesgo | null
   resumenTemporada: ResumenTemporada | null
   estadoPlayoffsPendiente: EstadoPlayoffsPendiente | null
+  // OVR que tenía el jugador cuando se generó la decisión ANTERIOR (no la actual) — el ancla
+  // para calcular cuánto cambió el OVR al resolverla. Bug real encontrado jugando: antes se
+  // comparaba contra `historial.at(-2)`, que no corresponde a "antes de esta decisión" en
+  // absoluto (con dificultad Normal/Exprés un bloque empuja 2-3 filas de historial de
+  // golpe, todas con el mismo OVR) — el resultado era un "+N" que nunca se veía reflejado.
+  ovrAlIniciarDecision: number
+  ultimoCambioOvr: number
   retirado: boolean
 }
 
@@ -139,6 +149,8 @@ export function crearCarrera(
     ultimoResultadoRiesgo: null,
     resumenTemporada: null,
     estadoPlayoffsPendiente: null,
+    ovrAlIniciarDecision: ovr,
+    ultimoCambioOvr: 0,
     retirado: false,
   }
 }
@@ -271,6 +283,24 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
   const historial: EntradaHistorial[] = [...carrera.historial]
   const nivelClub = carrera.clubActual?.nivel ?? null
 
+  // Cierra el turno: calcula cuánto cambió el OVR desde que se generó la decisión anterior
+  // (el ancla guardada en `carrera.ovrAlIniciarDecision`) y deja un ancla nueva para la
+  // decisión que se está por mostrar. Se llama en cada punto donde este bloque termina
+  // generando una nueva decisión (draft/especialización/riesgo/trade/club/jugada-final).
+  function conProximaDecision(eventoPendiente: EventoPendiente, extra: Partial<Carrera> = {}): Carrera {
+    return {
+      ...carrera,
+      jugador,
+      historial,
+      trofeos,
+      resumenTemporada,
+      eventoPendiente,
+      ultimoCambioOvr: jugador.ovr - carrera.ovrAlIniciarDecision,
+      ovrAlIniciarDecision: jugador.ovr,
+      ...extra,
+    }
+  }
+
   for (let i = 0; i < carrera.intervaloTemporadas; i++) {
     const jugadorAnterior = jugador
     jugador = avanzarTemporada(jugador, azar)
@@ -306,15 +336,10 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       if (regular.clasifico) {
         const resultado = simularPlayoffs(nivelEquipo, jugadorAnterior.ovr, azar)
         if (resultado.estado === 'pendiente') {
-          return {
-            ...carrera,
-            jugador,
-            historial,
-            trofeos,
-            resumenTemporada,
-            estadoPlayoffsPendiente: { nivelEquipo, ronda: resultado.ronda, rival: resultado.rival },
-            eventoPendiente: { tipo: 'jugada-final', rival: resultado.rival },
-          }
+          return conProximaDecision(
+            { tipo: 'jugada-final', rival: resultado.rival },
+            { estadoPlayoffsPendiente: { nivelEquipo, ronda: resultado.ronda, rival: resultado.rival } },
+          )
         }
         if (resultado.estado === 'campeon') {
           trofeos = { ...trofeos, anillos: trofeos.anillos + 1 }
@@ -337,30 +362,16 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
     // Incluye la opción de quedarte en tu club/universidad actual — cruzar el umbral
     // te DA la chance de entrar al draft, no te obliga (pedido del usuario).
     if (carrera.fase === 'pre-nba' && jugador.ovr >= UMBRAL_DRAFT_OVR) {
-      return {
-        ...carrera,
-        jugador,
-        historial,
-        trofeos,
-        resumenTemporada,
-        eventoPendiente: {
-          tipo: 'draft',
-          opciones: elegirTraspasoOfrecido(equiposNba, jugador.ovr, carrera.clubActual!, azar),
-        },
-      }
+      return conProximaDecision({
+        tipo: 'draft',
+        opciones: elegirTraspasoOfrecido(equiposNba, jugador.ovr, carrera.clubActual!, azar),
+      })
     }
 
     // Decisión de especialización (triplero/interior) — una sola vez en toda la carrera,
     // solo para posiciones de perímetro, en la ventana de edad "de mitad de carrera".
     if (tocaEventoEspecializacion(carrera.posicion, jugador.edad, carrera.especializacion !== null, azar)) {
-      return {
-        ...carrera,
-        jugador,
-        historial,
-        trofeos,
-        resumenTemporada,
-        eventoPendiente: { tipo: 'especializacion', opciones: OPCIONES_ESPECIALIZACION },
-      }
+      return conProximaDecision({ tipo: 'especializacion', opciones: OPCIONES_ESPECIALIZACION })
     }
   }
 
@@ -376,7 +387,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
           opciones: elegirTraspasoOfrecido(carrera.poolPreNba, jugador.ovr, carrera.clubActual!, azar),
         }
 
-    return { ...carrera, jugador, historial, trofeos, resumenTemporada, eventoPendiente }
+    return conProximaDecision(eventoPendiente)
   }
 
   // fase 'nba': alterna entre evento de trade/agencia libre y decisión de riesgo.
@@ -386,5 +397,5 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       ? { tipo: 'riesgo', decision: generarDecisionRiesgo(azar) }
       : { tipo: 'trade', opciones: elegirTraspasoOfrecido(equiposNba, jugador.ovr, carrera.clubActual!, azar) }
 
-  return { ...carrera, jugador, historial, trofeos, resumenTemporada, eventoPendiente }
+  return conProximaDecision(eventoPendiente)
 }

@@ -56,7 +56,9 @@ function OvrAnimado({ objetivo, inicial }: { objetivo: number; inicial: number }
   const elite = esNivelElite(mostrado)
   return (
     <div
-      className="font-marcador text-7xl leading-none transition-colors duration-300 sm:text-8xl"
+      className={`font-marcador text-5xl leading-none transition-colors duration-300 sm:text-8xl ${
+        objetivo !== inicial ? 'animar-ovr' : ''
+      }`}
       style={{ color, textShadow: elite ? `0 0 24px ${color}99` : 'none' }}
     >
       {mostrado}
@@ -68,8 +70,8 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
   const [eligiendoId, setEligiendoId] = useState<string | null>(null)
   const historialReciente = carrera.historial.slice(-9)
   const ultimaTemporada = carrera.historial.at(-1)
-  const anterior = carrera.historial.at(-2)
-  const diferenciaOvr = anterior ? carrera.jugador.ovr - anterior.ovr : 0
+  const diferenciaOvr = carrera.ultimoCambioOvr
+  const hayCambioPrevio = carrera.historial.length > 0
   const resultadoRiesgo = carrera.ultimoResultadoRiesgo
   const resumen = carrera.resumenTemporada
   const evento = carrera.eventoPendiente
@@ -92,16 +94,20 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
       {/* Header persistente — OVR, valor, vitrina de trofeos siempre visible (pedido del
           usuario: "muestra de premios en vivo"), edad/temporadas/equipo. */}
       <div className="grid grid-cols-1 border-b-2 border-hueso sm:grid-cols-2">
-        <div className="border-b border-hueso/15 px-6 py-6 sm:border-b-0 sm:border-r-2">
+        <div className="border-b border-hueso/15 px-4 py-4 sm:border-b-0 sm:border-r-2 sm:px-6 sm:py-6">
           <div className="flex items-baseline justify-between">
-            <div className="font-mono-stats text-[10px] tracking-[0.2em] text-hueso/45">OVR ACTUAL</div>
-            <div className="font-mono-stats text-xs tracking-[0.06em] text-hueso/60">
+            <div className="font-mono-stats text-[9px] tracking-[0.2em] text-hueso/45 sm:text-[10px]">OVR ACTUAL</div>
+            <div className="font-mono-stats text-[10px] tracking-[0.06em] text-hueso/60 sm:text-xs">
               {formatoValorMercado(calcularValorMercadoEuros(carrera.jugador.ovr))}
             </div>
           </div>
-          <div className="flex items-end gap-3">
-            <OvrAnimado key={carrera.historial.length} objetivo={carrera.jugador.ovr} inicial={anterior?.ovr ?? carrera.jugador.ovr} />
-            {anterior && (
+          <div className="flex items-end gap-2 sm:gap-3">
+            <OvrAnimado
+              key={carrera.historial.length}
+              objetivo={carrera.jugador.ovr}
+              inicial={carrera.jugador.ovr - diferenciaOvr}
+            />
+            {hayCambioPrevio && diferenciaOvr !== 0 && (
               <div key={`${carrera.historial.length}-delta`} className="animar-delta pb-2">
                 <div className={`font-titulo text-lg font-semibold ${diferenciaOvr >= 0 ? 'text-en-vivo' : 'text-hueso/60'}`}>
                   {diferenciaOvr >= 0 ? '+' : ''}
@@ -113,76 +119,78 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
           {resultadoRiesgo && (
             <div
               key={`${carrera.historial.length}-riesgo`}
-              className="animar-chip sombra-brutal mt-3 inline-flex items-center gap-2 border-2 border-hueso bg-superficie-alta px-3 py-2"
+              className="animar-chip sombra-brutal mt-2 inline-flex items-center gap-1.5 border-2 border-hueso bg-superficie-alta px-2 py-1.5 sm:mt-3 sm:gap-2 sm:px-3 sm:py-2"
             >
               <span
-                className="font-marcador text-base leading-none uppercase"
+                className="font-marcador text-sm leading-none uppercase sm:text-base"
                 style={{ color: resultadoRiesgo.rol === 'titular' ? '#4ade80' : '#f59e0b' }}
               >
                 {resultadoRiesgo.rol === 'titular' ? 'TITULAR' : 'ROTACIÓN'}
               </span>
-              <span className="font-mono-stats text-[10px] leading-tight tracking-[0.06em] text-hueso/75">
+              <span className="font-mono-stats text-[9px] leading-tight tracking-[0.06em] text-hueso/75 sm:text-[10px]">
                 {resultadoRiesgo.titulo}
-                <br />
-                {resultadoRiesgo.texto}
+                <span className="hidden sm:inline">
+                  <br />
+                  {resultadoRiesgo.texto}
+                </span>
               </span>
             </div>
           )}
           {resumen && (
             <div
               key={`${carrera.historial.length}-resumen`}
-              className="animar-chip sombra-brutal mt-3 inline-flex flex-col gap-1 border-2 border-hueso bg-superficie-alta px-3 py-2"
+              className="animar-chip sombra-brutal mt-2 inline-flex flex-col gap-1 border-2 border-hueso bg-superficie-alta px-2 py-1.5 sm:mt-3 sm:px-3 sm:py-2"
             >
-              <span className="font-mono-stats text-[10px] leading-tight tracking-[0.06em] text-hueso/75">
+              <span className="font-mono-stats text-[9px] leading-tight tracking-[0.06em] text-hueso/75 sm:text-[10px]">
                 TEMPORADA REGULAR · {resumen.victorias}-{resumen.derrotas}
               </span>
               {resumen.campeon && (
-                <span className="font-titulo text-sm font-semibold uppercase text-acento">🏆 Campeones de playoffs</span>
+                <span className="font-titulo text-xs font-semibold uppercase text-acento sm:text-sm">🏆 Campeones de playoffs</span>
               )}
               {resumen.eliminado && (
-                <span className="font-titulo text-sm font-semibold uppercase text-hueso/70">
+                <span className="font-titulo text-xs font-semibold uppercase text-hueso/70 sm:text-sm">
                   Eliminados en {nombreRonda(resumen.eliminado.ronda)} vs {resumen.eliminado.rival} ({resumen.eliminado.marcador})
                 </span>
               )}
               {!resumen.clasifico && (
-                <span className="font-titulo text-sm font-semibold uppercase text-hueso/50">No clasificaron a playoffs</span>
+                <span className="font-titulo text-xs font-semibold uppercase text-hueso/50 sm:text-sm">No clasificaron a playoffs</span>
               )}
             </div>
           )}
-          <div className="linea-jugada my-4" />
+          <div className="linea-jugada my-2.5 sm:my-4" />
           <div className="flex gap-0">
             <div className="flex-1">
-              <div className="font-mono-stats text-[9px] tracking-[0.16em] text-hueso/45">EDAD</div>
-              <div className="font-marcador text-4xl leading-none">{carrera.jugador.edad}</div>
+              <div className="font-mono-stats text-[8px] tracking-[0.16em] text-hueso/45 sm:text-[9px]">EDAD</div>
+              <div className="font-marcador text-2xl leading-none sm:text-4xl">{carrera.jugador.edad}</div>
             </div>
-            <div className="flex-1 border-l border-hueso/15 pl-4">
-              <div className="font-mono-stats text-[9px] tracking-[0.16em] text-hueso/45">TEMPORADAS</div>
-              <div className="font-marcador text-4xl leading-none">{carrera.historial.length}</div>
+            <div className="flex-1 border-l border-hueso/15 pl-3 sm:pl-4">
+              <div className="font-mono-stats text-[8px] tracking-[0.16em] text-hueso/45 sm:text-[9px]">TEMPORADAS</div>
+              <div className="font-marcador text-2xl leading-none sm:text-4xl">{carrera.historial.length}</div>
             </div>
-            <div className="flex-1 border-l border-hueso/15 pl-4">
-              <div className="font-mono-stats text-[9px] tracking-[0.16em] text-hueso/45">EQUIPO</div>
-              <div className="mt-1 flex items-center gap-2">
+            <div className="flex-1 border-l border-hueso/15 pl-3 sm:pl-4">
+              <div className="font-mono-stats text-[8px] tracking-[0.16em] text-hueso/45 sm:text-[9px]">EQUIPO</div>
+              <div className="mt-1 flex items-center gap-1.5 sm:gap-2">
                 {carrera.clubActual?.escudoUrl && (
-                  <img src={carrera.clubActual.escudoUrl} alt="" className="h-6 w-6 object-contain" />
+                  <img src={carrera.clubActual.escudoUrl} alt="" className="h-5 w-5 shrink-0 object-contain sm:h-6 sm:w-6" />
                 )}
-                <div className="font-titulo text-base font-semibold uppercase leading-tight">
+                <div className="truncate font-titulo text-xs font-semibold uppercase leading-tight sm:text-base">
                   {carrera.clubActual?.nombre ?? '—'}
                 </div>
               </div>
               {carrera.especializacion && (
-                <div className="mt-1 font-mono-stats text-[9px] tracking-[0.1em] text-acento">
-                  {carrera.especializacion === 'triplero' ? 'ESPECIALIZACIÓN: TRIPLERO' : 'ESPECIALIZACIÓN: INTERIOR'}
+                <div className="mt-1 font-mono-stats text-[8px] tracking-[0.1em] text-acento sm:text-[9px]">
+                  {carrera.especializacion === 'triplero' ? 'TRIPLERO' : 'INTERIOR'}
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-6">
-          <div className="mb-3 flex items-baseline justify-between font-mono-stats text-[10px] tracking-[0.16em] text-hueso/45">
+        <div className="px-4 py-3 sm:px-6 sm:py-6">
+          <div className="mb-2 flex items-baseline justify-between font-mono-stats text-[9px] tracking-[0.16em] text-hueso/45 sm:mb-3 sm:text-[10px]">
             <span>VITRINA</span>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {[
               { cantidad: carrera.trofeos.anillos, label: 'ANILLOS' },
               { cantidad: carrera.trofeos.mvp, label: 'MVP' },
@@ -190,14 +198,14 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
             ].map((t) => (
               <div
                 key={`${t.label}-${t.cantidad}`}
-                className={`flex flex-col items-center justify-center gap-1 border border-hueso/20 py-4 text-center ${
+                className={`flex flex-col items-center justify-center gap-0.5 border border-hueso/20 py-2 text-center sm:gap-1 sm:py-4 ${
                   t.cantidad > 0 ? 'animar-trofeo' : ''
                 }`}
               >
-                <div className={`font-marcador text-3xl leading-none ${t.cantidad > 0 ? 'text-acento' : ''}`}>
+                <div className={`font-marcador text-xl leading-none sm:text-3xl ${t.cantidad > 0 ? 'text-acento' : ''}`}>
                   {t.cantidad}
                 </div>
-                <div className="font-mono-stats text-[9px] tracking-[0.1em] text-hueso/45">{t.label}</div>
+                <div className="font-mono-stats text-[8px] tracking-[0.1em] text-hueso/45 sm:text-[9px]">{t.label}</div>
               </div>
             ))}
           </div>
@@ -205,7 +213,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
       </div>
 
       {ultimaTemporada && (
-        <div key={`${carrera.historial.length}-stats`} className="animar-chip border-b-2 border-hueso/15 px-6 py-6">
+        <div key={`${carrera.historial.length}-stats`} className="animar-chip hidden border-b-2 border-hueso/15 px-6 py-6 sm:block">
           <div className="mb-3 font-mono-stats text-[10px] tracking-[0.2em] text-hueso/45">
             ÚLTIMA TEMPORADA · {ultimaTemporada.clubNombre ?? '—'}
           </div>
@@ -231,12 +239,12 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
         <div className="border-b-2 border-hueso/15">
           {evento.tipo === 'riesgo' && (
             <>
-              <div className="relative px-6 py-6 text-center">
-                <span className="mb-3 inline-block bg-acento px-3 py-1 font-mono-stats text-[10px] font-bold tracking-[0.2em] text-fondo">
+              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
+                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
                   COMPETENCIA POR EL PUESTO
                 </span>
-                <div className="font-marcador text-3xl leading-none sm:text-4xl">{evento.decision.titulo.toUpperCase()}</div>
-                <div className="mx-auto mt-2 max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65">
+                <div className="font-marcador text-2xl leading-none sm:text-4xl">{evento.decision.titulo.toUpperCase()}</div>
+                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
                   {evento.decision.descripcion}
                 </div>
               </div>
@@ -244,7 +252,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                 <button
                   type="button"
                   onClick={() => onElegir('arriesgar')}
-                  className="flex flex-col gap-3 border-t-4 border-acento bg-fondo px-4 py-5 text-left hover:bg-superficie"
+                  className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
                 >
                   <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em]">Competir</div>
                   <div className="flex gap-2">
@@ -271,7 +279,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                 <button
                   type="button"
                   onClick={() => onElegir('seguro')}
-                  className="flex flex-col gap-3 border-t-4 border-hueso/30 bg-fondo px-4 py-5 text-left hover:bg-superficie"
+                  className="flex flex-col gap-2 border-t-4 border-hueso/30 bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
                 >
                   <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em] text-hueso/80">
                     Aceptar rotación
@@ -293,12 +301,12 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
 
           {evento.tipo === 'especializacion' && (
             <>
-              <div className="relative px-6 py-6 text-center">
-                <span className="mb-3 inline-block bg-acento px-3 py-1 font-mono-stats text-[10px] font-bold tracking-[0.2em] text-fondo">
+              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
+                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
                   MOMENTO DE DEFINIRTE
                 </span>
-                <div className="font-marcador text-3xl leading-none sm:text-4xl">¿EN QUÉ TE ESPECIALIZÁS?</div>
-                <div className="mx-auto mt-2 max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65">
+                <div className="font-marcador text-2xl leading-none sm:text-4xl">¿EN QUÉ TE ESPECIALIZÁS?</div>
+                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
                   Es una sola vez en tu carrera — define tu estilo de juego de acá en adelante.
                 </div>
               </div>
@@ -308,7 +316,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                     key={opcion.id}
                     type="button"
                     onClick={() => onElegir(opcion.id)}
-                    className="flex flex-col gap-3 border-t-4 border-acento bg-fondo px-4 py-5 text-left hover:bg-superficie"
+                    className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
                   >
                     <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em]">{opcion.nombre}</div>
                     <div className="font-titulo text-sm font-light leading-relaxed text-hueso/70">{opcion.descripcion}</div>
@@ -328,12 +336,12 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
 
           {evento.tipo === 'jugada-final' && (
             <>
-              <div className="relative px-6 py-6 text-center">
-                <span className="mb-3 inline-block bg-acento px-3 py-1 font-mono-stats text-[10px] font-bold tracking-[0.2em] text-fondo">
+              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
+                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
                   FINAL DE PLAYOFFS · vs {evento.rival.toUpperCase()}
                 </span>
-                <div className="font-marcador text-3xl leading-none sm:text-4xl">JUGADA FINAL</div>
-                <div className="mx-auto mt-2 max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65">
+                <div className="font-marcador text-2xl leading-none sm:text-4xl">JUGADA FINAL</div>
+                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
                   Serie 1-1. Quedás libre de marca para el triple — cómo lo resolvés decide el título.
                 </div>
               </div>
@@ -343,7 +351,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                     key={opcion.id}
                     type="button"
                     onClick={() => onElegir(opcion.id)}
-                    className="flex flex-col gap-3 border-t-4 border-acento bg-fondo px-4 py-5 text-left hover:bg-superficie"
+                    className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
                   >
                     <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em]">{opcion.nombre}</div>
                     <div className="font-titulo text-sm font-light leading-relaxed text-hueso/70">{opcion.descripcion}</div>
@@ -364,16 +372,16 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
           {(evento.tipo === 'club-liga-domestica' || evento.tipo === 'draft' || evento.tipo === 'trade') && (
             <>
               <AnimacionAro disparar={eligiendoId !== null} onTerminada={() => eligiendoId && onElegir(eligiendoId)} />
-              <div className="relative px-6 py-6 text-center">
-                <span className="mb-3 inline-block bg-acento px-3 py-1 font-mono-stats text-[10px] font-bold tracking-[0.2em] text-fondo">
+              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
+                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
                   {TITULOS_EVENTO[evento.tipo].etiqueta}
                 </span>
-                <div className="font-marcador text-3xl leading-none sm:text-4xl">{TITULOS_EVENTO[evento.tipo].titulo}</div>
-                <div className="mx-auto mt-2 max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65">
+                <div className="font-marcador text-2xl leading-none sm:text-4xl">{TITULOS_EVENTO[evento.tipo].titulo}</div>
+                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
                   {TITULOS_EVENTO[evento.tipo].bajada}
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-0.5 bg-hueso/10 sm:grid-cols-3">
+              <div className="grid grid-cols-3 gap-0.5 bg-hueso/10">
                 {evento.opciones.map((opcion: Equipo) => {
                   const esQuedarse = opcion.id === carrera.clubActual?.id
                   const activo = eligiendoId === opcion.id
@@ -386,46 +394,47 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                       onClick={() => elegirConAnimacion(opcion.id)}
                       disabled={bloqueado}
                       style={{ opacity: bloqueado && !activo ? 0.4 : 1 }}
-                      className={`flex flex-col gap-3 border-t-4 bg-fondo px-4 py-5 text-left transition-opacity hover:bg-superficie active:scale-[0.98] ${
+                      className={`flex flex-col gap-2 border-t-4 bg-fondo px-2 py-2.5 text-left transition-opacity hover:bg-superficie active:scale-[0.98] sm:gap-3 sm:px-4 sm:py-5 sm:active:scale-100 ${
                         esQuedarse ? 'border-hueso/40' : 'border-acento'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="font-titulo text-lg font-semibold uppercase leading-tight tracking-[0.02em]">
-                          {opcion.nombre}
-                        </div>
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-hueso/25 bg-superficie-alta font-titulo text-sm font-semibold">
+                      <div className="flex flex-col items-center gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-hueso/25 bg-superficie-alta font-titulo text-[10px] font-semibold sm:order-2 sm:h-11 sm:w-11 sm:text-sm">
                           {opcion.escudoUrl ? (
                             <img src={opcion.escudoUrl} alt="" className="h-9 w-9 object-contain" />
                           ) : (
                             abreviarNombre(opcion.nombre)
                           )}
                         </div>
+                        <div className="line-clamp-2 text-center font-titulo text-[11px] font-semibold uppercase leading-tight tracking-[0.02em] sm:order-1 sm:text-left sm:text-lg sm:tracking-[0.02em]">
+                          {opcion.nombre}
+                        </div>
                       </div>
                       <div>
-                        <div className="mb-1.5 flex items-baseline justify-between font-mono-stats text-[9px] tracking-[0.14em] text-hueso/45">
-                          <span>NIVEL DE PLANTEL</span>
-                          <span className="font-mono-stats text-xs text-hueso">{opcion.nivel}</span>
+                        <div className="mb-1 flex items-baseline justify-between font-mono-stats text-[8px] tracking-[0.1em] text-hueso/45 sm:mb-1.5 sm:text-[9px] sm:tracking-[0.14em]">
+                          <span className="hidden sm:inline">NIVEL DE PLANTEL</span>
+                          <span className="sm:hidden">NIVEL</span>
+                          <span className="font-mono-stats text-[10px] text-hueso sm:text-xs">{opcion.nivel}</span>
                         </div>
-                        <div className="h-2 bg-superficie">
+                        <div className="h-1.5 bg-superficie sm:h-2">
                           <div className="h-full bg-acento" style={{ width: `${opcion.nivel}%` }} />
                         </div>
                       </div>
                       <div className="flex gap-0.5 bg-hueso/10">
-                        <div className="flex-1 bg-superficie-alta/50 px-3 py-2">
-                          <div className="font-mono-stats text-[9px] tracking-[0.14em] text-hueso/45">ROL</div>
-                          <div className="mt-0.5 font-titulo text-sm font-semibold uppercase">{stats.rol}</div>
+                        <div className="flex-1 bg-superficie-alta/50 px-1.5 py-1.5 text-center sm:px-3 sm:py-2 sm:text-left">
+                          <div className="font-mono-stats text-[7px] tracking-[0.1em] text-hueso/45 sm:text-[9px] sm:tracking-[0.14em]">ROL</div>
+                          <div className="mt-0.5 truncate font-titulo text-[10px] font-semibold uppercase sm:text-sm">{stats.rol}</div>
                         </div>
-                        <div className="flex-1 bg-superficie-alta/50 px-3 py-2">
-                          <div className="font-mono-stats text-[9px] tracking-[0.14em] text-hueso/45">MIN/PJ EST.</div>
-                          <div className="mt-0.5 font-marcador text-xl leading-none">{stats.minutos}</div>
+                        <div className="flex-1 bg-superficie-alta/50 px-1.5 py-1.5 text-center sm:px-3 sm:py-2 sm:text-left">
+                          <div className="font-mono-stats text-[7px] tracking-[0.1em] text-hueso/45 sm:text-[9px] sm:tracking-[0.14em]">MIN/PJ</div>
+                          <div className="mt-0.5 font-marcador text-base leading-none sm:text-xl">{stats.minutos}</div>
                         </div>
                       </div>
-                      <div className="mt-auto flex items-center justify-between border-t border-hueso/15 pt-3">
-                        <span className={`font-mono-stats text-[9px] tracking-[0.1em] ${esQuedarse ? 'text-hueso/50' : 'text-acento'}`}>
+                      <div className="mt-auto flex flex-col gap-1.5 border-t border-hueso/15 pt-2 sm:flex-row sm:items-center sm:justify-between sm:pt-3">
+                        <span className={`line-clamp-1 text-center font-mono-stats text-[7px] leading-tight tracking-[0.06em] sm:line-clamp-none sm:text-left sm:text-[9px] sm:tracking-[0.1em] ${esQuedarse ? 'text-hueso/50' : 'text-acento'}`}>
                           {esQuedarse ? 'QUEDARTE ACÁ' : etiquetaDesafioClub(opcion.nivel, carrera.jugador.ovr)}
                         </span>
-                        <span className="bg-hueso px-4 py-2 font-titulo text-xs font-semibold tracking-[0.16em] text-fondo">
+                        <span className="w-full bg-hueso px-2 py-2 text-center font-titulo text-[10px] font-semibold tracking-[0.1em] text-fondo sm:w-auto sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
                           {activo ? 'FICHANDO…' : 'ELEGIR'}
                         </span>
                       </div>
@@ -433,7 +442,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                   )
                 })}
               </div>
-              <div className="border-t border-hueso/15 px-6 py-4 font-mono-stats text-[10px] tracking-[0.1em] text-hueso/40">
+              <div className="border-t border-hueso/15 px-4 py-2 text-center font-mono-stats text-[8px] tracking-[0.08em] text-hueso/40 sm:px-6 sm:py-4 sm:text-left sm:text-[10px] sm:tracking-[0.1em]">
                 NO HAY DESHACER · LA ELECCIÓN CIERRA PUERTAS MÁS ADELANTE
               </div>
             </>
