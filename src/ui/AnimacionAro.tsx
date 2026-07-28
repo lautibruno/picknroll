@@ -38,8 +38,8 @@ export function AnimacionAro({ disparar, onTerminada }: AnimacionAroProps) {
         : 'ball-bounce-idle 1.8s ease-in-out infinite'
 
   return (
-    <div className="relative h-16 shrink-0 overflow-hidden border-b-2 border-hueso bg-superficie textura-parquet sm:h-40">
-      <div className="absolute inset-0 h-40 origin-top scale-[0.4] sm:scale-100">
+    <div className="relative h-20 shrink-0 overflow-hidden border-b-2 border-hueso bg-superficie textura-parquet sm:h-40">
+      <div className="absolute inset-0 h-40 origin-top scale-50 sm:scale-100">
       {/* Tablero + aro */}
       <div className="absolute left-1/2 top-3 h-10 w-16 -translate-x-1/2 border-[3px] border-hueso bg-superficie-alta">
         <div className="absolute left-1/2 top-1/2 h-4 w-6 -translate-x-1/2 -translate-y-1/2 border-2 border-hueso" />
