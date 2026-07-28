@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Carrera, Equipo } from '../engine/motorCarrera'
+import type { Carrera, Equipo, IconoTrofeo } from '../engine/motorCarrera'
 import { calcularEstadisticasTemporada } from '../engine/estadisticas'
 import { colorPorOvr, esNivelElite } from './colorOvr'
 import { calcularValorMercadoEuros, formatoValorMercado } from '../engine/valorMercado'
 import { useNumeroAnimado } from './useNumeroAnimado'
 import { OPCIONES_JUGADA_FINAL, nombreRonda } from '../engine/playoffs'
+import { ICONOS_TROFEO, ETIQUETA_TROFEO } from './iconosTrofeos'
+
+const DURACION_CARTEL_TROFEOS_MS = 2800
+
+const CLAVE_TROFEO = {
+  anillo: 'anillos',
+  allstar: 'allStar',
+  mvp: 'mvp',
+  mundial: 'mundial',
+  jjoo: 'jjoo',
+} as const
 
 // Dashboard único y continuo, densidad estilo copero.com.ar/juegos/simulador-carrera
 // (pedido explícito del usuario, con captura de referencia): header compacto de una sola
@@ -110,6 +121,36 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
     setClubBloqueado(false)
   }, [evento])
 
+  // Cartel de festejo — pedido explícito del usuario: "cuando salís campeón/te convocan a
+  // All-Star/Mundial/JJOO/ganás MVP debe aparecer un cartel por un pequeño momento". Se
+  // detectan trofeos nuevos de dos formas: los que vienen en filas de historial recién
+  // agregadas (All-Star/MVP/Mundial/JJOO, ver motorCarrera.ts) y el conteo de anillos, que
+  // puede subir SIN agregar una fila nueva (el anillo se marca retroactivo en una fila ya
+  // existente cuando se gana la Final vía jugada final).
+  const previoRef = useRef({ historialLen: carrera.historial.length, anillos: carrera.trofeos.anillos })
+  const [cartelTrofeos, setCartelTrofeos] = useState<IconoTrofeo[] | null>(null)
+  useEffect(() => {
+    const previo = previoRef.current
+    const nuevos: IconoTrofeo[] = []
+    if (carrera.historial.length > previo.historialLen) {
+      for (const entrada of carrera.historial.slice(previo.historialLen)) {
+        for (const t of entrada.trofeosGanados) {
+          if (t !== 'anillo') nuevos.push(t)
+        }
+      }
+    }
+    if (carrera.trofeos.anillos > previo.anillos) nuevos.push('anillo')
+    previoRef.current = { historialLen: carrera.historial.length, anillos: carrera.trofeos.anillos }
+
+    if (nuevos.length > 0) {
+      setCartelTrofeos(nuevos)
+      const t = setTimeout(() => setCartelTrofeos(null), DURACION_CARTEL_TROFEOS_MS)
+      return () => clearTimeout(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe reaccionar a que
+    // cambien la CANTIDAD de temporadas/anillos, no cada vez que el array se recrea
+  }, [carrera.historial.length, carrera.trofeos.anillos])
+
   function elegirClub(opcionId: string) {
     if (clubBloqueado) return
     setClubBloqueado(true)
@@ -132,6 +173,21 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
 
   return (
     <div className="mx-auto max-w-2xl border-2 border-hueso/15 bg-fondo">
+      {cartelTrofeos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-fondo/80 p-6">
+          <div className="animar-trofeo sombra-brutal flex flex-col items-center gap-3 border-2 border-hueso bg-superficie-alta px-8 py-6">
+            <div className="flex gap-3">
+              {cartelTrofeos.map((t, i) => {
+                const Icono = ICONOS_TROFEO[t]
+                return <Icono key={i} className="h-11 w-11 text-acento sm:h-14 sm:w-14" />
+              })}
+            </div>
+            <div className="font-titulo text-base font-bold uppercase tracking-wide text-hueso sm:text-lg">
+              {cartelTrofeos.map((t) => ETIQUETA_TROFEO[t]).join(' · ')}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header compacto de una sola franja — OVR/valor/edad/equipo, sin bloques gigantes. */}
       <div className="flex items-center gap-2 border-b-2 border-hueso px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
         <OvrAnimado key={carrera.historial.length} objetivo={carrera.jugador.ovr} inicial={carrera.jugador.ovr - diferenciaOvr} />
@@ -160,23 +216,19 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {carrera.trofeos.anillos + carrera.trofeos.mvp + carrera.trofeos.allStar > 0 && (
-            <div className="flex items-center gap-1">
-              {carrera.trofeos.anillos > 0 && (
-                <span key={`anillos-${carrera.trofeos.anillos}`} className="animar-trofeo font-mono-stats text-[10px] text-acento sm:text-xs">
-                  🏆{carrera.trofeos.anillos}
-                </span>
-              )}
-              {carrera.trofeos.mvp > 0 && (
-                <span key={`mvp-${carrera.trofeos.mvp}`} className="animar-trofeo font-mono-stats text-[10px] text-acento sm:text-xs">
-                  MVP{carrera.trofeos.mvp}
-                </span>
-              )}
-              {carrera.trofeos.allStar > 0 && (
-                <span key={`as-${carrera.trofeos.allStar}`} className="animar-trofeo font-mono-stats text-[10px] text-acento sm:text-xs">
-                  AS{carrera.trofeos.allStar}
-                </span>
-              )}
+          {(['anillo', 'mvp', 'allstar', 'mundial', 'jjoo'] as const).some((t) => carrera.trofeos[CLAVE_TROFEO[t]] > 0) && (
+            <div className="flex items-center gap-1.5">
+              {(['anillo', 'mvp', 'allstar', 'mundial', 'jjoo'] as const).map((t) => {
+                const cantidad = carrera.trofeos[CLAVE_TROFEO[t]]
+                if (cantidad === 0) return null
+                const Icono = ICONOS_TROFEO[t]
+                return (
+                  <span key={`${t}-${cantidad}`} className="animar-trofeo flex items-center gap-0.5 text-acento">
+                    <Icono className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="font-mono-stats text-[9px] sm:text-[10px]">{cantidad}</span>
+                  </span>
+                )
+              })}
             </div>
           )}
           <div className="text-right">
@@ -394,6 +446,14 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
             <div className="flex flex-1 items-center gap-1.5 truncate">
               {entrada.clubEscudoUrl && <img src={entrada.clubEscudoUrl} alt="" className="h-3.5 w-3.5 shrink-0 object-contain" />}
               <span className="truncate font-titulo font-medium uppercase tracking-[0.02em]">{entrada.clubNombre ?? '—'}</span>
+              {entrada.trofeosGanados.length > 0 && (
+                <span className="flex shrink-0 items-center gap-0.5">
+                  {entrada.trofeosGanados.map((t, ti) => {
+                    const Icono = ICONOS_TROFEO[t]
+                    return <Icono key={ti} className="h-3 w-3 text-acento" />
+                  })}
+                </span>
+              )}
             </div>
             <div className="w-8 text-right text-hueso/60">{entrada.pj}</div>
             <div className="w-9 text-right text-hueso/80">{entrada.ppg}</div>

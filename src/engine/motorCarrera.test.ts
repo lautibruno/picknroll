@@ -350,11 +350,15 @@ describe('motorCarrera', () => {
       resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
     }
     const anillosPrevios = carrera.trofeos.anillos
+    const indiceTemporadaCampeon = carrera.historial.length - 1
     // azarUnaVezLuego evita que la temporada siguiente (que arranca en el mismo llamado)
     // clasifique a playoffs por casualidad y confunda el conteo de anillos — el resultado
     // de la jugada final en sí ya viene resuelto en el propio evento, no depende del azar acá.
     carrera = elegirOpcion(carrera, 'finta', azarUnaVezLuego(0.01, 0.99), EQUIPOS_NBA)
     expect(carrera.trofeos.anillos).toBe(anillosPrevios + 1)
+    // el ícono de anillo se marca retroactivamente en la fila de la temporada del título
+    // (pedido del usuario: "figurar como iconos... en la temporada que se ganó")
+    expect(carrera.historial[indiceTemporadaCampeon].trofeosGanados).toContain('anillo')
     // la carrera sigue: elegirOpcion ya encadenó a la próxima temporada/decisión
     expect(carrera.eventoPendiente).not.toBeNull()
     expect(carrera.estadoPlayoffsPendiente).toBeNull()
@@ -395,5 +399,19 @@ describe('motorCarrera', () => {
     expect(carrera.eventoPendiente?.tipo).toBe('riesgo')
     carrera = elegirOpcion(carrera, 'seguro', azarFijo(0.5), EQUIPOS_NBA)
     expect(carrera.ultimoCambioOvr).toBe(0)
+  })
+
+  it('una temporada NBA con OVR de nivel All-Star marca el ícono en esa fila del historial', () => {
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
+    carrera = {
+      ...carrera,
+      fase: 'nba',
+      clubActual: { id: 'club-test', nombre: 'Club Test', nivel: 40 },
+      jugador: { ...carrera.jugador, ovr: 82, edad: 25, potencial: 95 },
+      eventoPendiente: null,
+    }
+    carrera = avanzarSiCorresponde(carrera, EQUIPOS_NBA, azarFijo(0.99))
+    expect(carrera.historial.at(-1)?.trofeosGanados).toContain('allstar')
   })
 })

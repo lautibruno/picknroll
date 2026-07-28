@@ -14,7 +14,7 @@ import { INTERVALO_TEMPORADAS_POR_DIFICULTAD, UMBRAL_DRAFT_OVR, type DificultadC
 import { LIGAS_POR_PAIS } from './datos/ligasPorPais'
 import { EQUIPOS_CAMINO_GENERICO } from './datos/equiposCaminoGenerico'
 import { calcularEstadisticasTemporada, type EstadisticasTemporada, type Rol } from './estadisticas'
-import { evaluarTrofeosTemporada, TROFEOS_INICIALES, type Trofeos } from './trofeos'
+import { evaluarTrofeosTemporada, TROFEOS_INICIALES, type Trofeos, type TrofeosGanadosTemporada } from './trofeos'
 import { generarDecisionRiesgo, type DecisionRiesgo } from './decisionesRiesgo'
 import {
   OPCIONES_ESPECIALIZACION,
@@ -53,12 +53,38 @@ export type EventoPendiente =
   // verdad, sin tirar un dado nuevo cuando el jugador elige.
   | { tipo: 'jugada-final'; rival: string; resultadoSiFinta: boolean; resultadoSiTriple: boolean }
 
+// Íconos de trofeo/convocatoria a mostrar en el historial (pedido explícito del usuario:
+// "figurar como iconos reales de copas pequeñas en la lista de equipos en la temporada
+// que se ganó") — ver src/ui/iconosTrofeos.tsx para el dibujo de cada uno.
+export type IconoTrofeo = 'anillo' | 'allstar' | 'mvp' | 'mundial' | 'jjoo'
+
 export interface EntradaHistorial extends EstadisticasTemporada {
   edad: number
   ovr: number
   clubId: string | null
   clubNombre: string | null
   clubEscudoUrl: string | null
+  trofeosGanados: IconoTrofeo[]
+}
+
+function iconosDeGanados(ganados: TrofeosGanadosTemporada): IconoTrofeo[] {
+  const iconos: IconoTrofeo[] = []
+  if (ganados.allStar) iconos.push('allstar')
+  if (ganados.mvp) iconos.push('mvp')
+  if (ganados.mundial) iconos.push('mundial')
+  if (ganados.jjoo) iconos.push('jjoo')
+  return iconos
+}
+
+// El anillo se sabe DESPUÉS de que la fila de esa temporada ya se empujó al historial
+// (viene de ganar los playoffs, resueltos en el mismo bloque o incluso en un llamado
+// posterior si hubo jugada final) — se agrega retroactivamente a la última fila.
+function conAnilloEnUltimaTemporada(historial: EntradaHistorial[]): EntradaHistorial[] {
+  if (historial.length === 0) return historial
+  const copia = [...historial]
+  const ultima = copia[copia.length - 1]
+  copia[copia.length - 1] = { ...ultima, trofeosGanados: [...ultima.trofeosGanados, 'anillo'] }
+  return copia
 }
 
 export interface ResultadoRiesgo {
@@ -183,6 +209,7 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
         {
           ...carrera,
           trofeos: { ...carrera.trofeos, anillos: carrera.trofeos.anillos + 1 },
+          historial: conAnilloEnUltimaTemporada(carrera.historial),
           resumenTemporada: { ...resumenBase, campeon: true },
           eventoPendiente: null,
           estadoPlayoffsPendiente: null,
@@ -314,15 +341,23 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       carrera.especializacion,
       carrera.rolForzado,
     )
+    const { trofeos: trofeosActualizados, ganados } = evaluarTrofeosTemporada(
+      trofeos,
+      jugadorAnterior.ovr,
+      jugadorAnterior.edad,
+      carrera.fase,
+      azar,
+    )
+    trofeos = trofeosActualizados
     historial.push({
       edad: jugadorAnterior.edad,
       ovr: jugadorAnterior.ovr,
       clubId: carrera.clubActual?.id ?? null,
       clubNombre: carrera.clubActual?.nombre ?? null,
       clubEscudoUrl: carrera.clubActual?.escudoUrl ?? null,
+      trofeosGanados: iconosDeGanados(ganados),
       ...estadisticas,
     })
-    trofeos = evaluarTrofeosTemporada(trofeos, jugadorAnterior.ovr, carrera.fase, azar)
 
     // Temporada regular + playoffs simulados — solo en fase NBA (pedido del usuario:
     // "implementar para jugar playoffs... cuando clasificamos que haya una simulación de
@@ -351,6 +386,8 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
         if (resultado.estado === 'campeon') {
           trofeos = { ...trofeos, anillos: trofeos.anillos + 1 }
           resumenTemporada = { ...regular, campeon: true }
+          const ultima = historial[historial.length - 1]
+          historial[historial.length - 1] = { ...ultima, trofeosGanados: [...ultima.trofeosGanados, 'anillo'] }
         } else {
           resumenTemporada = {
             ...regular,
