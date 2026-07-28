@@ -1,40 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Carrera, Equipo } from '../engine/motorCarrera'
 import { calcularEstadisticasTemporada } from '../engine/estadisticas'
 import { colorPorOvr, esNivelElite } from './colorOvr'
 import { calcularValorMercadoEuros, formatoValorMercado } from '../engine/valorMercado'
 import { useNumeroAnimado } from './useNumeroAnimado'
-import { AnimacionAro } from './AnimacionAro'
 import { OPCIONES_JUGADA_FINAL, nombreRonda } from '../engine/playoffs'
 
-// Dashboard único y continuo — rehecho jugando copero.com.ar/juegos/simulador-carrera en
-// vivo (pedido explícito del usuario, confirmado con preguntas): ahí no hay una pantalla
-// "Progreso" separada de la pantalla "Evento" con un botón "Seguir jugando" en el medio.
-// Todo vive en una sola pantalla: el header (OVR/edad/valor/vitrina de trofeos/historial)
-// siempre visible arriba, y el panel de la decisión pendiente siempre visible abajo — se
-// resuelve una decisión y ya se ve la próxima, sin pantalla intermedia ni click extra.
+// Dashboard único y continuo, densidad estilo copero.com.ar/juegos/simulador-carrera
+// (pedido explícito del usuario, con captura de referencia): header compacto de una sola
+// franja, historial en filas chicas, sin textos ni espacios de relleno. El panel de la
+// decisión pendiente vive siempre abajo — se resuelve y ya se ve la próxima, sin pantalla
+// intermedia ni click extra.
 
 interface PantallaCarreraProps {
   carrera: Carrera
   onElegir: (opcionId: string) => void
 }
 
-const TITULOS_EVENTO: Record<string, { etiqueta: string; titulo: string; bajada: string }> = {
-  'club-liga-domestica': {
-    etiqueta: 'CANTERA',
-    titulo: 'TRES CLUBES TE QUIEREN',
-    bajada: 'Las opciones salen de tu nivel actual, no de tu techo — un club más grande te hace crecer más.',
-  },
-  draft: {
-    etiqueta: 'DRAFT NBA',
-    titulo: 'TRES FRANQUICIAS TE QUIEREN',
-    bajada: 'Cruzaste el umbral — llegó tu oportunidad.',
-  },
-  trade: {
-    etiqueta: 'AGENCIA LIBRE',
-    titulo: 'SE ABRE EL MERCADO',
-    bajada: 'Elegí bien: no hay deshacer.',
-  },
+const TITULOS_EVENTO: Record<string, string> = {
+  'club-liga-domestica': 'CANTERA',
+  draft: 'DRAFT NBA',
+  trade: 'AGENCIA LIBRE',
 }
 
 function abreviarNombre(nombre: string): string {
@@ -44,10 +30,10 @@ function abreviarNombre(nombre: string): string {
 
 function etiquetaDesafioClub(nivelClub: number, ovr: number): string {
   const diferencia = nivelClub - ovr
-  if (diferencia >= 10) return 'DESAFÍO GRANDE · CRECÉS MUCHO'
-  if (diferencia >= 0) return 'DESAFÍO · CRECÉS BIEN'
-  if (diferencia >= -10) return 'CÓMODO · CRECÉS POCO'
-  return 'CLUB CHICO · CASI NO CRECÉS'
+  if (diferencia >= 10) return 'CRECÉS MUCHO'
+  if (diferencia >= 0) return 'CRECÉS BIEN'
+  if (diferencia >= -10) return 'CRECÉS POCO'
+  return 'CASI NO CRECÉS'
 }
 
 function OvrAnimado({ objetivo, inicial }: { objetivo: number; inicial: number }) {
@@ -56,259 +42,235 @@ function OvrAnimado({ objetivo, inicial }: { objetivo: number; inicial: number }
   const elite = esNivelElite(mostrado)
   return (
     <div
-      className={`font-marcador text-5xl leading-none transition-colors duration-300 sm:text-8xl ${
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border-2 border-hueso font-marcador text-xl leading-none sm:h-14 sm:w-14 sm:text-2xl ${
         objetivo !== inicial ? 'animar-ovr' : ''
       }`}
-      style={{ color, textShadow: elite ? `0 0 24px ${color}99` : 'none' }}
+      style={{ color, backgroundColor: `${color}22`, boxShadow: elite ? `0 0 14px ${color}88` : 'none' }}
     >
       {mostrado}
     </div>
   )
 }
 
+// Ciclo de revelado tipo "ta-te-ti" para la decisión de riesgo (pedido explícito del
+// usuario: "mostrarle al usuario el azar" en vivo) — el resultado YA está resuelto al
+// generar el evento (ver decisionesRiesgo.ts), esto solo lo dramatiza: alterna el
+// resaltado entre las dos opciones, cada vez más lento, y termina asentándose en la
+// respuesta real antes de aplicar la elección.
+const SECUENCIA_REVELADO = 7
+function useRevelado(onTerminar: () => void) {
+  const [destacado, setDestacado] = useState<'a' | 'b' | null>(null)
+  const activoRef = useRef(false)
+
+  function iniciar(resultadoFinal: 'a' | 'b') {
+    if (activoRef.current) return
+    activoRef.current = true
+    let paso = 0
+    const siguiente = () => {
+      paso++
+      const esUltimo = paso >= SECUENCIA_REVELADO
+      setDestacado(esUltimo ? resultadoFinal : paso % 2 === 0 ? 'a' : 'b')
+      if (!esUltimo) {
+        setTimeout(siguiente, 110 + paso * 35)
+      } else {
+        setTimeout(() => {
+          activoRef.current = false
+          setDestacado(null)
+          onTerminar()
+        }, 650)
+      }
+    }
+    setDestacado(paso % 2 === 0 ? 'a' : 'b')
+    setTimeout(siguiente, 110)
+  }
+
+  return { destacado, revelando: destacado !== null, iniciar }
+}
+
 export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
-  const [eligiendoId, setEligiendoId] = useState<string | null>(null)
-  const historialReciente = carrera.historial.slice(-9)
-  const ultimaTemporada = carrera.historial.at(-1)
+  const [clubBloqueado, setClubBloqueado] = useState(false)
+  const historialReciente = carrera.historial.slice(-8)
   const diferenciaOvr = carrera.ultimoCambioOvr
   const hayCambioPrevio = carrera.historial.length > 0
   const resultadoRiesgo = carrera.ultimoResultadoRiesgo
   const resumen = carrera.resumenTemporada
   const evento = carrera.eventoPendiente
 
-  // El dashboard ya no se desmonta entre decisiones (a diferencia de las pantallas
-  // separadas de antes) — sin este reset, `eligiendoId` quedaba pegado al club elegido en
-  // la decisión anterior y bloqueaba la tarjeta equivocada en la siguiente (bug real
-  // encontrado jugando: "FICHANDO…" trabado en el club viejo tras el primer fichaje).
+  const revelado = useRevelado(() => {
+    if (evento?.tipo === 'riesgo') onElegir('arriesgar')
+  })
+  const reveladoFinal = useRevelado(() => {
+    if (evento?.tipo === 'jugada-final') onElegir(opcionJugadaFinalPendiente.current)
+  })
+  const opcionJugadaFinalPendiente = useRef<string>('finta')
+
+  // El dashboard ya no se desmonta entre decisiones — sin este reset, el bloqueo de las
+  // tarjetas de club quedaba pegado a la decisión anterior (bug real encontrado jugando).
   useEffect(() => {
-    setEligiendoId(null)
+    setClubBloqueado(false)
   }, [evento])
 
-  function elegirConAnimacion(opcionId: string) {
-    if (eligiendoId) return
-    setEligiendoId(opcionId)
+  function elegirClub(opcionId: string) {
+    if (clubBloqueado) return
+    setClubBloqueado(true)
+    onElegir(opcionId)
+  }
+
+  function competir() {
+    if (evento?.tipo !== 'riesgo') return
+    revelado.iniciar(evento.decision.exito ? 'a' : 'b')
+  }
+
+  function jugarJugadaFinal(opcionId: string) {
+    if (evento?.tipo !== 'jugada-final') return
+    // El resultado ya está resuelto al generar el evento (ver playoffs.ts) — el revelado
+    // en vivo es fiel a lo que en verdad va a pasar, no un dado nuevo e independiente.
+    const exito = opcionId === 'triple' ? evento.resultadoSiTriple : evento.resultadoSiFinta
+    opcionJugadaFinalPendiente.current = opcionId
+    reveladoFinal.iniciar(exito ? 'a' : 'b')
   }
 
   return (
     <div className="mx-auto max-w-2xl border-2 border-hueso/15 bg-fondo">
-      {/* Header persistente — OVR, valor, vitrina de trofeos siempre visible (pedido del
-          usuario: "muestra de premios en vivo"), edad/temporadas/equipo. */}
-      <div className="grid grid-cols-1 border-b-2 border-hueso sm:grid-cols-2">
-        <div className="border-b border-hueso/15 px-4 py-4 sm:border-b-0 sm:border-r-2 sm:px-6 sm:py-6">
-          <div className="flex items-baseline justify-between">
-            <div className="font-mono-stats text-[9px] tracking-[0.2em] text-hueso/45 sm:text-[10px]">OVR ACTUAL</div>
-            <div className="font-mono-stats text-[10px] tracking-[0.06em] text-hueso/60 sm:text-xs">
-              {formatoValorMercado(calcularValorMercadoEuros(carrera.jugador.ovr))}
-            </div>
-          </div>
-          <div className="flex items-end gap-2 sm:gap-3">
-            <OvrAnimado
-              key={carrera.historial.length}
-              objetivo={carrera.jugador.ovr}
-              inicial={carrera.jugador.ovr - diferenciaOvr}
-            />
+      {/* Header compacto de una sola franja — OVR/valor/edad/equipo, sin bloques gigantes. */}
+      <div className="flex items-center gap-2 border-b-2 border-hueso px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+        <OvrAnimado key={carrera.historial.length} objetivo={carrera.jugador.ovr} inicial={carrera.jugador.ovr - diferenciaOvr} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 font-mono-stats text-[8px] tracking-[0.1em] text-hueso/45 sm:text-[9px]">
+            <span>#{carrera.jugador.edad}</span>
+            <span>·</span>
+            <span className="uppercase">{carrera.posicion}</span>
             {hayCambioPrevio && diferenciaOvr !== 0 && (
-              <div key={`${carrera.historial.length}-delta`} className="animar-delta pb-2">
-                <div className={`font-titulo text-lg font-semibold ${diferenciaOvr >= 0 ? 'text-en-vivo' : 'text-hueso/60'}`}>
-                  {diferenciaOvr >= 0 ? '+' : ''}
-                  {diferenciaOvr}
-                </div>
-              </div>
+              <span
+                key={`${carrera.historial.length}-delta`}
+                className={`animar-delta ml-auto font-titulo text-xs font-bold sm:text-sm ${diferenciaOvr > 0 ? 'text-en-vivo' : 'text-hueso/60'}`}
+              >
+                {diferenciaOvr > 0 ? '+' : ''}
+                {diferenciaOvr}
+              </span>
             )}
           </div>
-          {resultadoRiesgo && (
-            <div
-              key={`${carrera.historial.length}-riesgo`}
-              className="animar-chip sombra-brutal mt-2 inline-flex items-center gap-1.5 border-2 border-hueso bg-superficie-alta px-2 py-1.5 sm:mt-3 sm:gap-2 sm:px-3 sm:py-2"
-            >
-              <span
-                className="font-marcador text-sm leading-none uppercase sm:text-base"
-                style={{ color: resultadoRiesgo.rol === 'titular' ? '#4ade80' : '#f59e0b' }}
-              >
-                {resultadoRiesgo.rol === 'titular' ? 'TITULAR' : 'ROTACIÓN'}
-              </span>
-              <span className="font-mono-stats text-[9px] leading-tight tracking-[0.06em] text-hueso/75 sm:text-[10px]">
-                {resultadoRiesgo.titulo}
-                <span className="hidden sm:inline">
-                  <br />
-                  {resultadoRiesgo.texto}
-                </span>
-              </span>
-            </div>
-          )}
-          {resumen && (
-            <div
-              key={`${carrera.historial.length}-resumen`}
-              className="animar-chip sombra-brutal mt-2 inline-flex flex-col gap-1 border-2 border-hueso bg-superficie-alta px-2 py-1.5 sm:mt-3 sm:px-3 sm:py-2"
-            >
-              <span className="font-mono-stats text-[9px] leading-tight tracking-[0.06em] text-hueso/75 sm:text-[10px]">
-                TEMPORADA REGULAR · {resumen.victorias}-{resumen.derrotas}
-              </span>
-              {resumen.campeon && (
-                <span className="font-titulo text-xs font-semibold uppercase text-acento sm:text-sm">🏆 Campeones de playoffs</span>
-              )}
-              {resumen.eliminado && (
-                <span className="font-titulo text-xs font-semibold uppercase text-hueso/70 sm:text-sm">
-                  Eliminados en {nombreRonda(resumen.eliminado.ronda)} vs {resumen.eliminado.rival} ({resumen.eliminado.marcador})
-                </span>
-              )}
-              {!resumen.clasifico && (
-                <span className="font-titulo text-xs font-semibold uppercase text-hueso/50 sm:text-sm">No clasificaron a playoffs</span>
-              )}
-            </div>
-          )}
-          <div className="linea-jugada my-2.5 sm:my-4" />
-          <div className="flex gap-0">
-            <div className="flex-1">
-              <div className="font-mono-stats text-[8px] tracking-[0.16em] text-hueso/45 sm:text-[9px]">EDAD</div>
-              <div className="font-marcador text-2xl leading-none sm:text-4xl">{carrera.jugador.edad}</div>
-            </div>
-            <div className="flex-1 border-l border-hueso/15 pl-3 sm:pl-4">
-              <div className="font-mono-stats text-[8px] tracking-[0.16em] text-hueso/45 sm:text-[9px]">TEMPORADAS</div>
-              <div className="font-marcador text-2xl leading-none sm:text-4xl">{carrera.historial.length}</div>
-            </div>
-            <div className="flex-1 border-l border-hueso/15 pl-3 sm:pl-4">
-              <div className="font-mono-stats text-[8px] tracking-[0.16em] text-hueso/45 sm:text-[9px]">EQUIPO</div>
-              <div className="mt-1 flex items-center gap-1.5 sm:gap-2">
-                {carrera.clubActual?.escudoUrl && (
-                  <img src={carrera.clubActual.escudoUrl} alt="" className="h-5 w-5 shrink-0 object-contain sm:h-6 sm:w-6" />
-                )}
-                <div className="truncate font-titulo text-xs font-semibold uppercase leading-tight sm:text-base">
-                  {carrera.clubActual?.nombre ?? '—'}
-                </div>
-              </div>
-              {carrera.especializacion && (
-                <div className="mt-1 font-mono-stats text-[8px] tracking-[0.1em] text-acento sm:text-[9px]">
-                  {carrera.especializacion === 'triplero' ? 'TRIPLERO' : 'INTERIOR'}
-                </div>
-              )}
-            </div>
+          <div className="flex items-center gap-1.5 truncate">
+            {carrera.clubActual?.escudoUrl && (
+              <img src={carrera.clubActual.escudoUrl} alt="" className="h-4 w-4 shrink-0 object-contain" />
+            )}
+            <span className="truncate font-titulo text-sm font-semibold uppercase leading-tight sm:text-base">
+              {carrera.clubActual?.nombre ?? 'Libre'}
+            </span>
           </div>
         </div>
-
-        <div className="px-4 py-3 sm:px-6 sm:py-6">
-          <div className="mb-2 flex items-baseline justify-between font-mono-stats text-[9px] tracking-[0.16em] text-hueso/45 sm:mb-3 sm:text-[10px]">
-            <span>VITRINA</span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-            {[
-              { cantidad: carrera.trofeos.anillos, label: 'ANILLOS' },
-              { cantidad: carrera.trofeos.mvp, label: 'MVP' },
-              { cantidad: carrera.trofeos.allStar, label: 'ALL-STAR' },
-            ].map((t) => (
-              <div
-                key={`${t.label}-${t.cantidad}`}
-                className={`flex flex-col items-center justify-center gap-0.5 border border-hueso/20 py-2 text-center sm:gap-1 sm:py-4 ${
-                  t.cantidad > 0 ? 'animar-trofeo' : ''
-                }`}
-              >
-                <div className={`font-marcador text-xl leading-none sm:text-3xl ${t.cantidad > 0 ? 'text-acento' : ''}`}>
-                  {t.cantidad}
-                </div>
-                <div className="font-mono-stats text-[8px] tracking-[0.1em] text-hueso/45 sm:text-[9px]">{t.label}</div>
-              </div>
-            ))}
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {carrera.trofeos.anillos + carrera.trofeos.mvp + carrera.trofeos.allStar > 0 && (
+            <div className="flex items-center gap-1">
+              {carrera.trofeos.anillos > 0 && (
+                <span key={`anillos-${carrera.trofeos.anillos}`} className="animar-trofeo font-mono-stats text-[10px] text-acento sm:text-xs">
+                  🏆{carrera.trofeos.anillos}
+                </span>
+              )}
+              {carrera.trofeos.mvp > 0 && (
+                <span key={`mvp-${carrera.trofeos.mvp}`} className="animar-trofeo font-mono-stats text-[10px] text-acento sm:text-xs">
+                  MVP{carrera.trofeos.mvp}
+                </span>
+              )}
+              {carrera.trofeos.allStar > 0 && (
+                <span key={`as-${carrera.trofeos.allStar}`} className="animar-trofeo font-mono-stats text-[10px] text-acento sm:text-xs">
+                  AS{carrera.trofeos.allStar}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="text-right">
+            <div className="font-mono-stats text-[8px] tracking-[0.1em] text-hueso/45 sm:text-[9px]">VALOR</div>
+            <div className="font-mono-stats text-[10px] font-semibold text-hueso/80 sm:text-xs">
+              {formatoValorMercado(calcularValorMercadoEuros(carrera.jugador.ovr))}
+            </div>
           </div>
         </div>
       </div>
 
-      {ultimaTemporada && (
-        <div key={`${carrera.historial.length}-stats`} className="animar-chip hidden border-b-2 border-hueso/15 px-6 py-6 sm:block">
-          <div className="mb-3 font-mono-stats text-[10px] tracking-[0.2em] text-hueso/45">
-            ÚLTIMA TEMPORADA · {ultimaTemporada.clubNombre ?? '—'}
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            {[
-              { valor: ultimaTemporada.ppg, label: 'PPG' },
-              { valor: ultimaTemporada.rpg, label: 'RPG' },
-              { valor: ultimaTemporada.apg, label: 'APG' },
-              { valor: ultimaTemporada.triples, label: '3PM' },
-              { valor: ultimaTemporada.pj, label: 'PJ' },
-            ].map((s) => (
-              <div key={s.label} className="border-l-4 border-acento bg-superficie-alta/40 px-3 py-3 text-center">
-                <div className="font-marcador text-4xl leading-none text-hueso">{s.valor}</div>
-                <div className="mt-1 font-mono-stats text-[9px] tracking-[0.14em] text-acento">{s.label}</div>
-              </div>
-            ))}
-          </div>
+      {/* Chips de resultado — solo si hay algo que contar, sin bloque de "vitrina" separado. */}
+      {(resultadoRiesgo || resumen || carrera.especializacion) && (
+        <div className="flex flex-wrap gap-1.5 border-b border-hueso/10 px-3 py-1.5 sm:px-4">
+          {resultadoRiesgo && (
+            <span
+              key={`${carrera.historial.length}-riesgo`}
+              className="animar-chip font-mono-stats text-[9px] tracking-[0.06em] sm:text-[10px]"
+              style={{ color: resultadoRiesgo.rol === 'titular' ? '#4ade80' : '#f59e0b' }}
+            >
+              {resultadoRiesgo.rol === 'titular' ? '● TITULAR' : '● ROTACIÓN'} · {resultadoRiesgo.titulo}
+            </span>
+          )}
+          {resumen && (
+            <span key={`${carrera.historial.length}-resumen`} className="animar-chip font-mono-stats text-[9px] tracking-[0.06em] text-hueso/70 sm:text-[10px]">
+              {resumen.victorias}-{resumen.derrotas}
+              {resumen.campeon && ' · 🏆 CAMPEONES'}
+              {resumen.eliminado && ` · Eliminados en ${nombreRonda(resumen.eliminado.ronda)} vs ${resumen.eliminado.rival}`}
+              {!resumen.clasifico && ' · afuera de playoffs'}
+            </span>
+          )}
+          {carrera.especializacion && (
+            <span className="font-mono-stats text-[9px] tracking-[0.06em] text-acento sm:text-[10px]">
+              {carrera.especializacion === 'triplero' ? 'TRIPLERO' : 'INTERIOR'}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Panel de decisión pendiente — siempre visible, sin pantalla intermedia. */}
+      {/* Panel de decisión pendiente. */}
       {evento && (
         <div className="border-b-2 border-hueso/15">
-          {evento.tipo === 'riesgo' && (
-            <>
-              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
-                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
-                  COMPETENCIA POR EL PUESTO
-                </span>
-                <div className="font-marcador text-2xl leading-none sm:text-4xl">{evento.decision.titulo.toUpperCase()}</div>
-                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
-                  {evento.decision.descripcion}
+          {evento.tipo === 'riesgo' &&
+            (revelado.revelando ? (
+              <div className="grid grid-cols-2 gap-1 p-3 sm:p-4">
+                {(['a', 'b'] as const).map((lado) => (
+                  <div
+                    key={lado}
+                    className={`flex items-center justify-center border-2 py-6 font-titulo text-lg font-bold uppercase transition-all sm:py-8 sm:text-xl ${
+                      revelado.destacado === lado
+                        ? 'scale-105 border-acento bg-acento text-fondo'
+                        : 'border-hueso/15 bg-superficie-alta text-hueso/30'
+                    }`}
+                  >
+                    {lado === 'a' ? 'Titular' : 'Rotación'}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="px-3 py-2 sm:px-4 sm:py-3">
+                  <div className="font-titulo text-base font-bold uppercase leading-tight sm:text-lg">
+                    {evento.decision.titulo}
+                  </div>
+                  <div className="mt-0.5 font-titulo text-xs font-light text-hueso/60 sm:text-sm">{evento.decision.descripcion}</div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
-                <button
-                  type="button"
-                  onClick={() => onElegir('arriesgar')}
-                  className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
-                >
-                  <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em]">Competir</div>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-superficie-alta/50 px-2 py-2 text-center">
-                      <div className="font-marcador text-lg leading-none text-en-vivo">Titular</div>
-                      <div className="mt-1 font-mono-stats text-[10px] tracking-[0.1em] text-hueso/50">
-                        {Math.round(evento.decision.probabilidadExito * 100)}%
-                      </div>
-                    </div>
-                    <div className="flex-1 bg-superficie-alta/50 px-2 py-2 text-center">
-                      <div className="font-marcador text-lg leading-none text-hueso/70">Rotación</div>
-                      <div className="mt-1 font-mono-stats text-[10px] tracking-[0.1em] text-hueso/50">
-                        {Math.round((1 - evento.decision.probabilidadExito) * 100)}%
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-auto flex items-center justify-between border-t border-hueso/15 pt-2">
-                    <span className="font-mono-stats text-[9px] tracking-[0.1em] text-acento">CON PROBABILIDAD VISIBLE</span>
-                    <span className="bg-hueso px-3 py-1.5 font-titulo text-xs font-semibold tracking-[0.16em] text-fondo">
-                      ELEGIR
+                <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
+                  <button
+                    type="button"
+                    onClick={competir}
+                    className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 hover:bg-superficie"
+                  >
+                    <span className="font-titulo text-sm font-semibold uppercase sm:text-base">Competir</span>
+                    <span className="font-mono-stats text-[9px] text-hueso/50">
+                      {Math.round(evento.decision.probabilidadExito * 100)}% titular
                     </span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onElegir('seguro')}
-                  className="flex flex-col gap-2 border-t-4 border-hueso/30 bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
-                >
-                  <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em] text-hueso/80">
-                    Aceptar rotación
-                  </div>
-                  <div className="bg-superficie-alta/50 px-2 py-2 text-center">
-                    <div className="font-marcador text-lg leading-none">Rotación</div>
-                    <div className="mt-1 font-mono-stats text-[10px] tracking-[0.1em] text-hueso/50">GARANTIZADO</div>
-                  </div>
-                  <div className="mt-auto flex items-center justify-between border-t border-hueso/15 pt-2">
-                    <span className="font-mono-stats text-[9px] tracking-[0.1em] text-hueso/40">SIN SORPRESAS</span>
-                    <span className="bg-hueso px-3 py-1.5 font-titulo text-xs font-semibold tracking-[0.16em] text-fondo">
-                      ELEGIR
-                    </span>
-                  </div>
-                </button>
-              </div>
-            </>
-          )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onElegir('seguro')}
+                    className="flex flex-col items-center gap-1 border-t-4 border-hueso/30 bg-fondo px-2 py-3 hover:bg-superficie"
+                  >
+                    <span className="font-titulo text-sm font-semibold uppercase text-hueso/80 sm:text-base">Aceptar rotación</span>
+                    <span className="font-mono-stats text-[9px] text-hueso/50">garantizado</span>
+                  </button>
+                </div>
+              </>
+            ))}
 
           {evento.tipo === 'especializacion' && (
             <>
-              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
-                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
-                  MOMENTO DE DEFINIRTE
-                </span>
-                <div className="font-marcador text-2xl leading-none sm:text-4xl">¿EN QUÉ TE ESPECIALIZÁS?</div>
-                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
-                  Es una sola vez en tu carrera — define tu estilo de juego de acá en adelante.
-                </div>
+              <div className="px-3 py-2 sm:px-4 sm:py-3">
+                <div className="font-titulo text-base font-bold uppercase leading-tight sm:text-lg">¿En qué te especializás?</div>
+                <div className="mt-0.5 font-titulo text-xs font-light text-hueso/60 sm:text-sm">Una sola vez en tu carrera.</div>
               </div>
               <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
                 {evento.opciones.map((opcion) => (
@@ -316,168 +278,130 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                     key={opcion.id}
                     type="button"
                     onClick={() => onElegir(opcion.id)}
-                    className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
+                    className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 hover:bg-superficie"
                   >
-                    <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em]">{opcion.nombre}</div>
-                    <div className="font-titulo text-sm font-light leading-relaxed text-hueso/70">{opcion.descripcion}</div>
-                    <div className="mt-auto flex items-center justify-between border-t border-hueso/15 pt-2">
-                      <span className="font-mono-stats text-[9px] tracking-[0.1em] text-acento">
-                        {opcion.id === 'triplero' ? 'MÁS TRIPLES' : 'MÁS REBOTES'}
-                      </span>
-                      <span className="bg-hueso px-3 py-1.5 font-titulo text-xs font-semibold tracking-[0.16em] text-fondo">
-                        ELEGIR
-                      </span>
-                    </div>
+                    <span className="font-titulo text-sm font-semibold uppercase sm:text-base">{opcion.nombre}</span>
+                    <span className="font-mono-stats text-[9px] text-acento">{opcion.id === 'triplero' ? 'MÁS TRIPLES' : 'MÁS REBOTES'}</span>
                   </button>
                 ))}
               </div>
             </>
           )}
 
-          {evento.tipo === 'jugada-final' && (
-            <>
-              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
-                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
-                  FINAL DE PLAYOFFS · vs {evento.rival.toUpperCase()}
-                </span>
-                <div className="font-marcador text-2xl leading-none sm:text-4xl">JUGADA FINAL</div>
-                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
-                  Serie 1-1. Quedás libre de marca para el triple — cómo lo resolvés decide el título.
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
-                {OPCIONES_JUGADA_FINAL.map((opcion) => (
-                  <button
-                    key={opcion.id}
-                    type="button"
-                    onClick={() => onElegir(opcion.id)}
-                    className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-3 sm:px-4 sm:py-5"
+          {evento.tipo === 'jugada-final' &&
+            (reveladoFinal.revelando ? (
+              <div className="grid grid-cols-2 gap-1 p-3 sm:p-4">
+                {(['a', 'b'] as const).map((lado) => (
+                  <div
+                    key={lado}
+                    className={`flex items-center justify-center border-2 py-6 font-titulo text-lg font-bold uppercase transition-all sm:py-8 sm:text-xl ${
+                      reveladoFinal.destacado === lado
+                        ? 'scale-105 border-acento bg-acento text-fondo'
+                        : 'border-hueso/15 bg-superficie-alta text-hueso/30'
+                    }`}
                   >
-                    <div className="font-titulo text-lg font-semibold uppercase tracking-[0.04em]">{opcion.nombre}</div>
-                    <div className="font-titulo text-sm font-light leading-relaxed text-hueso/70">{opcion.descripcion}</div>
-                    <div className="mt-auto flex items-center justify-between border-t border-hueso/15 pt-2">
-                      <span className="font-mono-stats text-[9px] tracking-[0.1em] text-acento">
-                        {Math.round(opcion.probabilidadExito * 100)}% DE ÉXITO
-                      </span>
-                      <span className="bg-hueso px-3 py-1.5 font-titulo text-xs font-semibold tracking-[0.16em] text-fondo">
-                        ELEGIR
-                      </span>
-                    </div>
-                  </button>
+                    {lado === 'a' ? '¡Adentro!' : 'Errada'}
+                  </div>
                 ))}
               </div>
-            </>
-          )}
+            ) : (
+              <>
+                <div className="px-3 py-2 sm:px-4 sm:py-3">
+                  <div className="font-mono-stats text-[9px] tracking-[0.1em] text-acento">FINAL vs {evento.rival.toUpperCase()}</div>
+                  <div className="font-titulo text-base font-bold uppercase leading-tight sm:text-lg">Jugada final</div>
+                </div>
+                <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
+                  {OPCIONES_JUGADA_FINAL.map((opcion) => (
+                    <button
+                      key={opcion.id}
+                      type="button"
+                      onClick={() => jugarJugadaFinal(opcion.id)}
+                      className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 hover:bg-superficie"
+                    >
+                      <span className="font-titulo text-sm font-semibold uppercase sm:text-base">{opcion.nombre}</span>
+                      <span className="font-mono-stats text-[9px] text-hueso/50">{Math.round(opcion.probabilidadExito * 100)}% éxito</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ))}
 
           {(evento.tipo === 'club-liga-domestica' || evento.tipo === 'draft' || evento.tipo === 'trade') && (
             <>
-              <AnimacionAro disparar={eligiendoId !== null} onTerminada={() => eligiendoId && onElegir(eligiendoId)} />
-              <div className="relative px-4 py-3 text-center sm:px-6 sm:py-6">
-                <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-3 sm:px-3 sm:py-1 sm:text-[10px]">
-                  {TITULOS_EVENTO[evento.tipo].etiqueta}
+              <div className="flex items-center gap-2 px-3 py-1.5 sm:px-4">
+                <span className="bg-acento px-1.5 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.1em] text-fondo">
+                  {TITULOS_EVENTO[evento.tipo]}
                 </span>
-                <div className="font-marcador text-2xl leading-none sm:text-4xl">{TITULOS_EVENTO[evento.tipo].titulo}</div>
-                <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-2 sm:block">
-                  {TITULOS_EVENTO[evento.tipo].bajada}
-                </div>
               </div>
               <div className="grid grid-cols-3 gap-0.5 bg-hueso/10">
                 {evento.opciones.map((opcion: Equipo) => {
                   const esQuedarse = opcion.id === carrera.clubActual?.id
-                  const activo = eligiendoId === opcion.id
-                  const bloqueado = eligiendoId !== null
                   const stats = calcularEstadisticasTemporada(carrera.jugador.ovr, opcion.nivel, carrera.fase)
                   return (
                     <button
                       key={opcion.id}
                       type="button"
-                      onClick={() => elegirConAnimacion(opcion.id)}
-                      disabled={bloqueado}
-                      style={{ opacity: bloqueado && !activo ? 0.4 : 1 }}
-                      className={`flex flex-col gap-2 border-t-4 bg-fondo px-2 py-2.5 text-left transition-opacity hover:bg-superficie active:scale-[0.98] sm:gap-3 sm:px-4 sm:py-5 sm:active:scale-100 ${
+                      onClick={() => elegirClub(opcion.id)}
+                      disabled={clubBloqueado}
+                      className={`flex flex-col items-center gap-1 border-t-4 bg-fondo px-1.5 py-2 text-center transition-opacity active:scale-[0.97] disabled:opacity-40 ${
                         esQuedarse ? 'border-hueso/40' : 'border-acento'
                       }`}
                     >
-                      <div className="flex flex-col items-center gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-hueso/25 bg-superficie-alta font-titulo text-[10px] font-semibold sm:order-2 sm:h-11 sm:w-11 sm:text-sm">
-                          {opcion.escudoUrl ? (
-                            <img src={opcion.escudoUrl} alt="" className="h-9 w-9 object-contain" />
-                          ) : (
-                            abreviarNombre(opcion.nombre)
-                          )}
-                        </div>
-                        <div className="line-clamp-2 text-center font-titulo text-[11px] font-semibold uppercase leading-tight tracking-[0.02em] sm:order-1 sm:text-left sm:text-lg sm:tracking-[0.02em]">
-                          {opcion.nombre}
-                        </div>
+                      <div className="flex h-8 w-8 items-center justify-center border border-hueso/25 bg-superficie-alta font-titulo text-[9px] font-semibold sm:h-10 sm:w-10">
+                        {opcion.escudoUrl ? (
+                          <img src={opcion.escudoUrl} alt="" className="h-6 w-6 object-contain sm:h-8 sm:w-8" />
+                        ) : (
+                          abreviarNombre(opcion.nombre)
+                        )}
                       </div>
-                      <div>
-                        <div className="mb-1 flex items-baseline justify-between font-mono-stats text-[8px] tracking-[0.1em] text-hueso/45 sm:mb-1.5 sm:text-[9px] sm:tracking-[0.14em]">
-                          <span className="hidden sm:inline">NIVEL DE PLANTEL</span>
-                          <span className="sm:hidden">NIVEL</span>
-                          <span className="font-mono-stats text-[10px] text-hueso sm:text-xs">{opcion.nivel}</span>
-                        </div>
-                        <div className="h-1.5 bg-superficie sm:h-2">
+                      <div className="line-clamp-2 font-titulo text-[10px] font-semibold uppercase leading-tight sm:text-xs">
+                        {opcion.nombre}
+                      </div>
+                      <div className="flex w-full items-center gap-1">
+                        <div className="h-1 flex-1 bg-superficie">
                           <div className="h-full bg-acento" style={{ width: `${opcion.nivel}%` }} />
                         </div>
+                        <span className="font-mono-stats text-[8px] text-hueso/50">{opcion.nivel}</span>
                       </div>
-                      <div className="flex gap-0.5 bg-hueso/10">
-                        <div className="flex-1 bg-superficie-alta/50 px-1.5 py-1.5 text-center sm:px-3 sm:py-2 sm:text-left">
-                          <div className="font-mono-stats text-[7px] tracking-[0.1em] text-hueso/45 sm:text-[9px] sm:tracking-[0.14em]">ROL</div>
-                          <div className="mt-0.5 truncate font-titulo text-[10px] font-semibold uppercase sm:text-sm">{stats.rol}</div>
-                        </div>
-                        <div className="flex-1 bg-superficie-alta/50 px-1.5 py-1.5 text-center sm:px-3 sm:py-2 sm:text-left">
-                          <div className="font-mono-stats text-[7px] tracking-[0.1em] text-hueso/45 sm:text-[9px] sm:tracking-[0.14em]">MIN/PJ</div>
-                          <div className="mt-0.5 font-marcador text-base leading-none sm:text-xl">{stats.minutos}</div>
-                        </div>
-                      </div>
-                      <div className="mt-auto flex flex-col gap-1.5 border-t border-hueso/15 pt-2 sm:flex-row sm:items-center sm:justify-between sm:pt-3">
-                        <span className={`line-clamp-1 text-center font-mono-stats text-[7px] leading-tight tracking-[0.06em] sm:line-clamp-none sm:text-left sm:text-[9px] sm:tracking-[0.1em] ${esQuedarse ? 'text-hueso/50' : 'text-acento'}`}>
-                          {esQuedarse ? 'QUEDARTE ACÁ' : etiquetaDesafioClub(opcion.nivel, carrera.jugador.ovr)}
-                        </span>
-                        <span className="w-full bg-hueso px-2 py-2 text-center font-titulo text-[10px] font-semibold tracking-[0.1em] text-fondo sm:w-auto sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
-                          {activo ? 'FICHANDO…' : 'ELEGIR'}
-                        </span>
+                      <div className="font-mono-stats text-[7px] uppercase tracking-[0.04em] text-hueso/40 sm:text-[8px]">
+                        {esQuedarse ? 'quedarte' : `${stats.rol} · ${etiquetaDesafioClub(opcion.nivel, carrera.jugador.ovr)}`}
                       </div>
                     </button>
                   )
                 })}
-              </div>
-              <div className="border-t border-hueso/15 px-4 py-2 text-center font-mono-stats text-[8px] tracking-[0.08em] text-hueso/40 sm:px-6 sm:py-4 sm:text-left sm:text-[10px] sm:tracking-[0.1em]">
-                NO HAY DESHACER · LA ELECCIÓN CIERRA PUERTAS MÁS ADELANTE
               </div>
             </>
           )}
         </div>
       )}
 
-      <div className="px-6 py-6">
-        <div className="mb-3 font-mono-stats text-[10px] tracking-[0.2em] text-hueso/45">HISTORIAL DE TEMPORADAS</div>
-        <div className="flex border-b-2 border-hueso/20 pb-2 font-mono-stats text-[9px] tracking-[0.12em] text-hueso/45">
-          <div className="w-11">EDAD</div>
-          <div className="flex-1">EQUIPO</div>
-          <div className="w-11 text-right">PJ</div>
-          <div className="w-11 text-right">PPG</div>
-          <div className="w-11 text-right">RPG</div>
-          <div className="w-11 text-right">APG</div>
-          <div className="w-11 text-right">3PM</div>
-          <div className="w-11 text-right">OVR</div>
+      {/* Historial — filas compactas, sin subtítulos de relleno. */}
+      <div className="px-3 py-2 sm:px-4 sm:py-3">
+        <div className="flex border-b border-hueso/15 pb-1 font-mono-stats text-[8px] tracking-[0.06em] text-hueso/40 sm:text-[9px]">
+          <div className="w-6">ED</div>
+          <div className="flex-1">CLUB</div>
+          <div className="w-8 text-right">PJ</div>
+          <div className="w-9 text-right">PPG</div>
+          <div className="w-9 text-right">3PM</div>
+          <div className="w-8 text-right">OVR</div>
         </div>
         {historialReciente.length === 0 && (
-          <div className="py-6 text-center font-titulo text-sm text-hueso/40">Todavía no jugaste ninguna temporada.</div>
+          <div className="py-3 text-center font-mono-stats text-[10px] text-hueso/30">Sin temporadas todavía.</div>
         )}
         {historialReciente.map((entrada, i) => (
-          <div key={i} className="flex items-center border-b border-hueso/10 py-2 font-mono-stats text-xs">
-            <div className="w-11 text-hueso/60">{entrada.edad}</div>
-            <div className="flex flex-1 items-center gap-2 truncate font-titulo text-sm font-medium uppercase tracking-[0.04em]">
-              {entrada.clubEscudoUrl && <img src={entrada.clubEscudoUrl} alt="" className="h-4 w-4 shrink-0 object-contain" />}
-              <span className="truncate">{entrada.clubNombre ?? '—'}</span>
+          <div key={i} className="flex items-center gap-1 border-b border-hueso/5 py-1 font-mono-stats text-[10px] sm:text-xs">
+            <div className="w-6 text-hueso/50">{entrada.edad}</div>
+            <div className="flex flex-1 items-center gap-1.5 truncate">
+              {entrada.clubEscudoUrl && <img src={entrada.clubEscudoUrl} alt="" className="h-3.5 w-3.5 shrink-0 object-contain" />}
+              <span className="truncate font-titulo font-medium uppercase tracking-[0.02em]">{entrada.clubNombre ?? '—'}</span>
             </div>
-            <div className="w-11 text-right text-hueso/70">{entrada.pj}</div>
-            <div className="w-11 text-right text-hueso">{entrada.ppg}</div>
-            <div className="w-11 text-right text-hueso/70">{entrada.rpg}</div>
-            <div className="w-11 text-right text-hueso/70">{entrada.apg}</div>
-            <div className="w-11 text-right text-hueso/70">{entrada.triples}</div>
-            <div className="w-11 text-right font-marcador text-lg" style={{ color: colorPorOvr(entrada.ovr) }}>
+            <div className="w-8 text-right text-hueso/60">{entrada.pj}</div>
+            <div className="w-9 text-right text-hueso/80">{entrada.ppg}</div>
+            <div className="w-9 text-right text-hueso/60">{entrada.triples}</div>
+            <div
+              className="w-8 rounded-sm px-1 text-right font-marcador text-xs"
+              style={{ color: colorPorOvr(entrada.ovr) }}
+            >
               {entrada.ovr}
             </div>
           </div>

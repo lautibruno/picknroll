@@ -345,14 +345,14 @@ describe('motorCarrera', () => {
     let carrera = llegarANba()
     carrera = {
       ...carrera,
-      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads' },
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', resultadoSiFinta: true, resultadoSiTriple: false },
       estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
       resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
     }
     const anillosPrevios = carrera.trofeos.anillos
-    // azarUnaVezLuego aísla la resolución de la jugada final (gana con 0.01 < 0.62) de la
-    // temporada siguiente que arranca en el mismo llamado (con 0.99 no clasifica a
-    // playoffs, así el conteo de anillos no se confunde con un segundo título de casualidad).
+    // azarUnaVezLuego evita que la temporada siguiente (que arranca en el mismo llamado)
+    // clasifique a playoffs por casualidad y confunda el conteo de anillos — el resultado
+    // de la jugada final en sí ya viene resuelto en el propio evento, no depende del azar acá.
     carrera = elegirOpcion(carrera, 'finta', azarUnaVezLuego(0.01, 0.99), EQUIPOS_NBA)
     expect(carrera.trofeos.anillos).toBe(anillosPrevios + 1)
     // la carrera sigue: elegirOpcion ya encadenó a la próxima temporada/decisión
@@ -364,12 +364,12 @@ describe('motorCarrera', () => {
     let carrera = llegarANba()
     carrera = {
       ...carrera,
-      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads' },
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', resultadoSiFinta: true, resultadoSiTriple: false },
       estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
       resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
     }
     const anillosPrevios = carrera.trofeos.anillos
-    carrera = elegirOpcion(carrera, 'triple', azarFijo(0.99), EQUIPOS_NBA) // 0.99 > 0.45 de probabilidad de éxito -> pierde
+    carrera = elegirOpcion(carrera, 'triple', azarUnaVezLuego(0.5, 0.99), EQUIPOS_NBA)
     expect(carrera.trofeos.anillos).toBe(anillosPrevios)
     expect(carrera.estadoPlayoffsPendiente).toBeNull()
   })

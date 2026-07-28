@@ -16,9 +16,13 @@ describe('generarCrecimientoPorTraspaso', () => {
     expect(Math.abs(crecimiento)).toBeLessThanOrEqual(3)
   })
 
-  it('un club bastante más chico que tu nivel no te hace crecer (o casi nada)', () => {
-    const crecimiento = generarCrecimientoPorTraspaso(75, 50, 2, null, azarFijo(0.5))
-    expect(crecimiento).toBeLessThanOrEqual(0)
+  it('un club bastante más chico que tu nivel te estanca, pero nunca te hace retroceder', () => {
+    // Pedido explícito del usuario: "crecer es imposible y disminuye muchísimo la OVR" —
+    // un club chico como mucho no aporta nada, jamás debería restar por sí solo.
+    for (let i = 0; i < 20; i++) {
+      const crecimiento = generarCrecimientoPorTraspaso(75, 50, 2, null, () => i / 20)
+      expect(crecimiento).toBeGreaterThanOrEqual(0)
+    }
   })
 
   it('más temporadas en el mismo bloque (Exprés) escala el crecimiento hacia arriba', () => {

@@ -11,7 +11,12 @@ export interface Equipo {
   escudoUrl?: string // opcional — sin esto, la UI cae al badge de iniciales (ver ligas domésticas, pendiente)
 }
 
-const MARGEN_NIVEL_SOBRE_OVR = 10
+// Subido de 10 a 18 (pedido del usuario: "crecer es imposible") — con margen chico, apenas
+// te acercabas al techo de un pool real (ej. las ~10 universidades del camino genérico) las
+// únicas ofertas elegibles quedaban por debajo de tu nivel, y ahí no había margen de
+// desafío real para seguir creciendo. Con más margen, clubes más ambiciosos siguen
+// apareciendo como opción incluso cuando ya sos bueno.
+const MARGEN_NIVEL_SOBRE_OVR = 18
 const CANTIDAD_OPCIONES = 3
 
 function elegirSinRepetir<T>(items: T[], cantidad: number, azar: Azar): T[] {

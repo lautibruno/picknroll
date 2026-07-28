@@ -124,7 +124,11 @@ function simularSerieBestOf3(
 export type ResultadoPlayoffs =
   | { estado: 'campeon' }
   | { estado: 'eliminado'; ronda: number; rival: string; marcador: string }
-  | { estado: 'pendiente'; ronda: number; rival: string }
+  // Los dos resultados posibles ya vienen resueltos acá mismo (mismo criterio que
+  // decisionesRiesgo.ts: "las cartas ya están sobre la mesa") — así la UI puede mostrar
+  // un revelado en vivo fiel a lo que en verdad va a pasar, en vez de tirar un dado nuevo
+  // cuando el jugador elige, que podía no coincidir con lo que la animación mostraba.
+  | { estado: 'pendiente'; ronda: number; rival: string; resultadoSiFinta: boolean; resultadoSiTriple: boolean }
 
 export function simularPlayoffs(nivelEquipo: number, ovrJugador: number, azar: Azar): ResultadoPlayoffs {
   for (let ronda = 1; ronda <= CANTIDAD_RONDAS_PLAYOFFS; ronda++) {
@@ -133,7 +137,13 @@ export function simularPlayoffs(nivelEquipo: number, ovrJugador: number, azar: A
     const resultado = simularSerieBestOf3(nivelEquipo, rival.nivel, azar, esFinal, ovrJugador)
 
     if ('pendiente' in resultado) {
-      return { estado: 'pendiente', ronda, rival: rival.nombre }
+      return {
+        estado: 'pendiente',
+        ronda,
+        rival: rival.nombre,
+        resultadoSiFinta: resolverJugadaFinal('finta', azar),
+        resultadoSiTriple: resolverJugadaFinal('triple', azar),
+      }
     }
     if (!resultado.gano) {
       return { estado: 'eliminado', ronda, rival: rival.nombre, marcador: resultado.marcador }

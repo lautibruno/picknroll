@@ -26,7 +26,6 @@ import {
   nivelEquipoCombinado,
   simularTemporadaRegular,
   simularPlayoffs,
-  resolverJugadaFinal,
   type ResultadoTemporadaRegular,
 } from './playoffs'
 
@@ -49,7 +48,10 @@ export type EventoPendiente =
   | { tipo: 'club-liga-domestica' | 'draft' | 'trade'; opciones: Equipo[] }
   | { tipo: 'riesgo'; decision: DecisionRiesgo }
   | { tipo: 'especializacion'; opciones: OpcionEspecializacion[] }
-  | { tipo: 'jugada-final'; rival: string }
+  // resultadoSiFinta/resultadoSiTriple ya están resueltos al generar el evento (ver
+  // playoffs.ts) — la UI puede mostrar un revelado en vivo fiel a lo que va a pasar de
+  // verdad, sin tirar un dado nuevo cuando el jugador elige.
+  | { tipo: 'jugada-final'; rival: string; resultadoSiFinta: boolean; resultadoSiTriple: boolean }
 
 export interface EntradaHistorial extends EstadisticasTemporada {
   edad: number
@@ -174,7 +176,7 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
   if (carrera.eventoPendiente.tipo === 'jugada-final') {
     const estado = carrera.estadoPlayoffsPendiente
     if (!estado) return { ...carrera, eventoPendiente: null }
-    const gano = resolverJugadaFinal(opcionId, azar)
+    const gano = opcionId === 'triple' ? carrera.eventoPendiente.resultadoSiTriple : carrera.eventoPendiente.resultadoSiFinta
     const resumenBase = carrera.resumenTemporada ?? { victorias: 0, derrotas: 0, clasifico: true }
     if (gano) {
       return avanzarSiCorresponde(
@@ -337,7 +339,12 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
         const resultado = simularPlayoffs(nivelEquipo, jugadorAnterior.ovr, azar)
         if (resultado.estado === 'pendiente') {
           return conProximaDecision(
-            { tipo: 'jugada-final', rival: resultado.rival },
+            {
+              tipo: 'jugada-final',
+              rival: resultado.rival,
+              resultadoSiFinta: resultado.resultadoSiFinta,
+              resultadoSiTriple: resultado.resultadoSiTriple,
+            },
             { estadoPlayoffsPendiente: { nivelEquipo, ronda: resultado.ronda, rival: resultado.rival } },
           )
         }
