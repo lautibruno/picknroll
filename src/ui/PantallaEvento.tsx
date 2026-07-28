@@ -4,6 +4,7 @@ import { calcularEstadisticasTemporada } from '../engine/estadisticas'
 import { colorPorOvr } from './colorOvr'
 import { calcularValorMercadoEuros, formatoValorMercado } from '../engine/valorMercado'
 import { AnimacionAro } from './AnimacionAro'
+import { OPCIONES_JUGADA_FINAL } from '../engine/playoffs'
 
 interface PantallaEventoProps {
   carrera: Carrera
@@ -191,6 +192,49 @@ export function PantallaEvento({ carrera, onElegir }: PantallaEventoProps) {
 
         <div className="hidden border-t-2 border-hueso/15 px-6 py-4 font-mono-stats text-[10px] tracking-[0.1em] text-hueso/40 sm:block">
           NO HAY DESHACER — ESTA ELECCIÓN TE ACOMPAÑA EL RESTO DE LA CARRERA
+        </div>
+      </div>
+    )
+  }
+
+  if (evento.tipo === 'jugada-final') {
+    return (
+      <div className="mx-auto flex h-[calc(100dvh-5rem)] max-w-2xl flex-col border-2 border-hueso/15 bg-fondo sm:h-auto">
+        <Hud carrera={carrera} />
+        <div className="relative shrink-0 border-b-2 border-hueso/15 px-4 py-3 text-center sm:px-6 sm:py-8">
+          <span className="mb-1.5 inline-block bg-acento px-2 py-0.5 font-mono-stats text-[8px] font-bold tracking-[0.2em] text-fondo sm:mb-4 sm:px-3 sm:py-1 sm:text-[10px]">
+            FINAL DE PLAYOFFS · vs {evento.rival.toUpperCase()}
+          </span>
+          <div className="font-marcador text-2xl leading-none sm:text-5xl">JUGADA FINAL</div>
+          <div className="mx-auto mt-1.5 hidden max-w-xl font-titulo text-sm font-light leading-relaxed text-hueso/65 sm:mt-3 sm:block">
+            Serie 1-1. Quedás libre de marca para el triple con el partido en juego — cómo lo resolvés decide el título.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
+          {OPCIONES_JUGADA_FINAL.map((opcion) => (
+            <button
+              key={opcion.id}
+              type="button"
+              onClick={() => onElegir(opcion.id)}
+              className="flex flex-col gap-2 border-t-4 border-acento bg-fondo px-3 py-3 text-left hover:bg-superficie sm:gap-4 sm:px-5 sm:py-6"
+            >
+              <div className="font-titulo text-sm font-semibold uppercase tracking-[0.04em] sm:text-xl">{opcion.nombre}</div>
+              <div className="hidden font-titulo text-sm font-light leading-relaxed text-hueso/70 sm:block">{opcion.descripcion}</div>
+              <div className="mt-auto flex items-center justify-between border-t border-hueso/15 pt-2 sm:pt-3">
+                <span className="hidden font-mono-stats text-[9px] tracking-[0.1em] text-acento sm:inline">
+                  {Math.round(opcion.probabilidadExito * 100)}% DE ÉXITO
+                </span>
+                <span className="ml-auto bg-hueso px-2.5 py-1.5 font-titulo text-[10px] font-semibold tracking-[0.16em] text-fondo sm:px-4 sm:py-2 sm:text-xs">
+                  ELEGIR
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="hidden border-t-2 border-hueso/15 px-6 py-4 font-mono-stats text-[10px] tracking-[0.1em] text-hueso/40 sm:block">
+          NO HAY DESHACER — ESTA JUGADA DECIDE EL CAMPEONATO
         </div>
       </div>
     )

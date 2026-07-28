@@ -16,6 +16,8 @@ function carreraBase(overrides: Partial<Carrera>): Carrera {
     historial: [],
     trofeos: { anillos: 0, allStar: 0, mvp: 0 },
     ultimoResultadoRiesgo: null,
+    resumenTemporada: null,
+    estadoPlayoffsPendiente: null,
     retirado: true,
     ...overrides,
   }

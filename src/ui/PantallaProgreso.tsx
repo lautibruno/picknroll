@@ -2,6 +2,7 @@ import type { Carrera } from '../engine/motorCarrera'
 import { useNumeroAnimado } from './useNumeroAnimado'
 import { colorPorOvr, esNivelElite } from './colorOvr'
 import { calcularValorMercadoEuros, formatoValorMercado } from '../engine/valorMercado'
+import { nombreRonda } from '../engine/playoffs'
 
 interface PantallaProgresoProps {
   carrera: Carrera
@@ -14,6 +15,7 @@ export function PantallaProgreso({ carrera, onSeguirJugando }: PantallaProgresoP
   const anterior = carrera.historial.at(-2)
   const diferenciaOvr = anterior ? carrera.jugador.ovr - anterior.ovr : 0
   const resultadoRiesgo = carrera.ultimoResultadoRiesgo
+  const resumen = carrera.resumenTemporada
   const ovrMostrado = useNumeroAnimado(carrera.jugador.ovr, anterior?.ovr ?? carrera.jugador.ovr)
   const colorOvr = colorPorOvr(ovrMostrado)
   const elite = esNivelElite(ovrMostrado)
@@ -63,6 +65,27 @@ export function PantallaProgreso({ carrera, onSeguirJugando }: PantallaProgresoP
                 <br />
                 {resultadoRiesgo.texto}
               </span>
+            </div>
+          )}
+          {resumen && (
+            <div
+              key={`${carrera.historial.length}-resumen`}
+              className="animar-chip sombra-brutal mt-3 inline-flex flex-col gap-1 border-2 border-hueso bg-superficie-alta px-3 py-2"
+            >
+              <span className="font-mono-stats text-[10px] leading-tight tracking-[0.06em] text-hueso/75">
+                TEMPORADA REGULAR · {resumen.victorias}-{resumen.derrotas}
+              </span>
+              {resumen.campeon && (
+                <span className="font-titulo text-sm font-semibold uppercase text-acento">🏆 Campeones de playoffs</span>
+              )}
+              {resumen.eliminado && (
+                <span className="font-titulo text-sm font-semibold uppercase text-hueso/70">
+                  Eliminados en {nombreRonda(resumen.eliminado.ronda)} vs {resumen.eliminado.rival} ({resumen.eliminado.marcador})
+                </span>
+              )}
+              {!resumen.clasifico && (
+                <span className="font-titulo text-sm font-semibold uppercase text-hueso/50">No clasificaron a playoffs</span>
+              )}
             </div>
           )}
           <div className="linea-jugada my-4" />

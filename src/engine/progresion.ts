@@ -19,13 +19,18 @@ interface RangoDelta {
   max: number
 }
 
-// Rangos ampliados (pedido del usuario: "poco azar, poca probabilidad de crecer" — la
-// curva anterior era demasiado plana/predecible). Más swing en ambas direcciones,
-// incluida la meseta 28-31, que ahora puede subir o bajar de verdad, no solo estancarse.
+// Curva rebalanceada (pedido del usuario: "el cálculo de OVR anda medio flojo" — con la
+// curva anterior la mayoría de las carreras pegaban el techo de potencial en 3-4
+// temporadas y después quedaban 15+ años estancadas/declinando sin nada que jugar). Ahora
+// el crecimiento se reparte en más temporadas (19-26, en vez de solo 19-23) con un pico
+// real 27-29 que todavía puede subir un poco, no una meseta chata — el declive recién
+// empieza en serio a los 30, y se acelera de a poco en vez de un salto brusco a los 32.
 function rangoPorEdad(edad: number): RangoDelta {
-  if (edad <= 23) return { min: 3, max: 8 }
-  if (edad <= 27) return { min: 2, max: 5 }
-  if (edad <= 31) return { min: -2, max: 3 }
+  if (edad <= 22) return { min: 2, max: 5 }
+  if (edad <= 26) return { min: 2, max: 6 }
+  if (edad <= 29) return { min: 0, max: 3 }
+  if (edad <= 33) return { min: -2, max: 1 }
+  if (edad <= 36) return { min: -4, max: -1 }
   return { min: -7, max: -3 }
 }
 

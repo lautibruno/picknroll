@@ -8,27 +8,27 @@ function azarFijo(...valores: number[]): () => number {
 }
 
 describe('generarPotencial', () => {
-  it('cae en el tramo 60-75 (mayoría) con tirada baja', () => {
+  it('cae en el tramo 62-78 (mayoría) con tirada baja', () => {
     const potencial = generarPotencial(azarFijo(0.1, 0))
-    expect(potencial).toBeGreaterThanOrEqual(60)
-    expect(potencial).toBeLessThanOrEqual(75)
+    expect(potencial).toBeGreaterThanOrEqual(62)
+    expect(potencial).toBeLessThanOrEqual(78)
   })
 
-  it('cae en el tramo 76-85 con tirada en el segundo rango', () => {
-    const potencial = generarPotencial(azarFijo(0.75, 0))
-    expect(potencial).toBeGreaterThanOrEqual(76)
-    expect(potencial).toBeLessThanOrEqual(85)
+  it('cae en el tramo 79-87 con tirada en el segundo rango', () => {
+    const potencial = generarPotencial(azarFijo(0.65, 0))
+    expect(potencial).toBeGreaterThanOrEqual(79)
+    expect(potencial).toBeLessThanOrEqual(87)
   })
 
-  it('cae en el tramo 86-92 (all-star) con tirada en el tercer rango', () => {
-    const potencial = generarPotencial(azarFijo(0.95, 0))
-    expect(potencial).toBeGreaterThanOrEqual(86)
-    expect(potencial).toBeLessThanOrEqual(92)
+  it('cae en el tramo 88-93 (all-star) con tirada en el tercer rango', () => {
+    const potencial = generarPotencial(azarFijo(0.85, 0))
+    expect(potencial).toBeGreaterThanOrEqual(88)
+    expect(potencial).toBeLessThanOrEqual(93)
   })
 
-  it('cae en el tramo 93-99 (elite histórico) con tirada muy alta', () => {
-    const potencial = generarPotencial(azarFijo(0.99, 0))
-    expect(potencial).toBeGreaterThanOrEqual(93)
+  it('cae en el tramo 94-99 (elite histórico) con tirada muy alta', () => {
+    const potencial = generarPotencial(azarFijo(0.97, 0))
+    expect(potencial).toBeGreaterThanOrEqual(94)
     expect(potencial).toBeLessThanOrEqual(99)
   })
 
@@ -38,22 +38,22 @@ describe('generarPotencial', () => {
     expect(alto).toBeGreaterThan(bajo)
   })
 
-  it('sobre muchas corridas, la mayoría cae en el tramo 60-75', () => {
+  it('sobre muchas corridas, la mayoría cae en el tramo 62-78', () => {
     let contadorMayoria = 0
     const total = 2000
     for (let i = 0; i < total; i++) {
       const potencial = generarPotencial(Math.random)
-      if (potencial >= 60 && potencial <= 75) contadorMayoria++
+      if (potencial >= 62 && potencial <= 78) contadorMayoria++
     }
-    // ~70% esperado, con margen amplio para no ser flaky
-    expect(contadorMayoria / total).toBeGreaterThan(0.6)
-    expect(contadorMayoria / total).toBeLessThan(0.8)
+    // ~50% esperado, con margen amplio para no ser flaky
+    expect(contadorMayoria / total).toBeGreaterThan(0.4)
+    expect(contadorMayoria / total).toBeLessThan(0.6)
   })
 
-  it('nunca devuelve un potencial fuera de rango [60, 99]', () => {
+  it('nunca devuelve un potencial fuera de rango [62, 99]', () => {
     for (let i = 0; i < 500; i++) {
       const potencial = generarPotencial(Math.random)
-      expect(potencial).toBeGreaterThanOrEqual(60)
+      expect(potencial).toBeGreaterThanOrEqual(62)
       expect(potencial).toBeLessThanOrEqual(99)
     }
   })

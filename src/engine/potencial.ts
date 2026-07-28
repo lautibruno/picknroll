@@ -9,11 +9,15 @@ interface TramoPotencial {
   max: number
 }
 
+// Tramos algo más generosos que la primera versión (pedido del usuario: el crecimiento
+// se sentía flojo porque el 70% de las carreras arrancaban a 40-50 OVR con techo 60-75 —
+// apenas 2-3 temporadas de margen antes de estancarse el resto de la carrera). Elite
+// sigue siendo raro por diseño, solo se corrió el piso de cada tramo unos puntos arriba.
 const TRAMOS: TramoPotencial[] = [
-  { probabilidad: 0.7, min: 60, max: 75 },
-  { probabilidad: 0.2, min: 76, max: 85 },
-  { probabilidad: 0.08, min: 86, max: 92 },
-  { probabilidad: 0.02, min: 93, max: 99 },
+  { probabilidad: 0.5, min: 62, max: 78 },
+  { probabilidad: 0.3, min: 79, max: 87 },
+  { probabilidad: 0.13, min: 88, max: 93 },
+  { probabilidad: 0.07, min: 94, max: 99 },
 ]
 
 export function generarPotencial(azar: Azar): number {

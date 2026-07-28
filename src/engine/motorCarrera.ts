@@ -22,8 +22,16 @@ import {
   type OpcionEspecializacion,
   type TipoEspecializacion,
 } from './especializacion'
+import {
+  nivelEquipoCombinado,
+  simularTemporadaRegular,
+  simularPlayoffs,
+  resolverJugadaFinal,
+  type ResultadoTemporadaRegular,
+} from './playoffs'
 
 export type { Equipo, DificultadCarrera, Trofeos, DecisionRiesgo, TipoEspecializacion }
+export type { ResultadoTemporadaRegular } from './playoffs'
 
 const EDAD_INICIAL = 19
 const EDAD_RETIRO = 40
@@ -38,6 +46,7 @@ export type EventoPendiente =
   | { tipo: 'club-liga-domestica' | 'draft' | 'trade'; opciones: Equipo[] }
   | { tipo: 'riesgo'; decision: DecisionRiesgo }
   | { tipo: 'especializacion'; opciones: OpcionEspecializacion[] }
+  | { tipo: 'jugada-final'; rival: string }
 
 export interface EntradaHistorial extends EstadisticasTemporada {
   edad: number
@@ -53,6 +62,23 @@ export interface ResultadoRiesgo {
   delta: number
 }
 
+// Resumen de cómo le fue al equipo en la temporada regular NBA recién jugada, y en
+// playoffs si clasificó — se muestra en PantallaProgreso (pedido del usuario: "que haya
+// mensajería de cómo nos fue en cada temporada"). Solo se genera en fase NBA.
+export interface ResumenTemporada extends ResultadoTemporadaRegular {
+  campeon?: boolean
+  eliminado?: { ronda: number; rival: string; marcador: string }
+}
+
+// Estado intermedio que se guarda solo mientras hay una jugada final (evento
+// 'jugada-final') pendiente de resolver — necesario para poder retomar la simulación de
+// playoffs justo donde quedó una vez que el jugador elige la opción.
+interface EstadoPlayoffsPendiente {
+  nivelEquipo: number
+  ronda: number
+  rival: string
+}
+
 export interface Carrera {
   jugador: EstadoJugador
   nacionalidad: string
@@ -66,6 +92,8 @@ export interface Carrera {
   historial: EntradaHistorial[]
   trofeos: Trofeos
   ultimoResultadoRiesgo: ResultadoRiesgo | null
+  resumenTemporada: ResumenTemporada | null
+  estadoPlayoffsPendiente: EstadoPlayoffsPendiente | null
   retirado: boolean
 }
 
@@ -105,6 +133,8 @@ export function crearCarrera(
     historial: [],
     trofeos: TROFEOS_INICIALES,
     ultimoResultadoRiesgo: null,
+    resumenTemporada: null,
+    estadoPlayoffsPendiente: null,
     retirado: false,
   }
 }
@@ -116,6 +146,34 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar): Ca
     const opcion = OPCIONES_ESPECIALIZACION.find((o) => o.id === opcionId)
     if (!opcion) return carrera
     return { ...carrera, especializacion: opcion.id, eventoPendiente: null }
+  }
+
+  // La jugada final de la Final de playoffs — resuelve el partido decisivo (2-1) y, como
+  // es siempre la última ronda, termina ahí mismo la serie: gana = campeón real (anillo),
+  // pierde = eliminado en la Final. No hay rondas para retomar después de esto.
+  if (carrera.eventoPendiente.tipo === 'jugada-final') {
+    const estado = carrera.estadoPlayoffsPendiente
+    if (!estado) return { ...carrera, eventoPendiente: null }
+    const gano = resolverJugadaFinal(opcionId, azar)
+    const resumenBase = carrera.resumenTemporada ?? { victorias: 0, derrotas: 0, clasifico: true }
+    if (gano) {
+      return {
+        ...carrera,
+        trofeos: { ...carrera.trofeos, anillos: carrera.trofeos.anillos + 1 },
+        resumenTemporada: { ...resumenBase, campeon: true },
+        eventoPendiente: null,
+        estadoPlayoffsPendiente: null,
+      }
+    }
+    return {
+      ...carrera,
+      resumenTemporada: {
+        ...resumenBase,
+        eliminado: { ronda: estado.ronda, rival: estado.rival, marcador: '1-2' },
+      },
+      eventoPendiente: null,
+      estadoPlayoffsPendiente: null,
+    }
   }
 
   if (carrera.eventoPendiente.tipo === 'riesgo') {
@@ -170,6 +228,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
 
   let jugador = carrera.jugador
   let trofeos = carrera.trofeos
+  let resumenTemporada = carrera.resumenTemporada
   const historial: EntradaHistorial[] = [...carrera.historial]
   const nivelClub = carrera.clubActual?.nivel ?? null
 
@@ -186,10 +245,46 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       clubEscudoUrl: carrera.clubActual?.escudoUrl ?? null,
       ...estadisticas,
     })
-    trofeos = evaluarTrofeosTemporada(trofeos, jugadorAnterior.ovr, nivelClub, carrera.fase, azar)
+    trofeos = evaluarTrofeosTemporada(trofeos, jugadorAnterior.ovr, carrera.fase, azar)
+
+    // Temporada regular + playoffs simulados — solo en fase NBA (pedido del usuario:
+    // "implementar para jugar playoffs... cuando clasificamos que haya una simulación de
+    // los partidos contra un rival ficticio"). Se simula la temporada entera del jugador
+    // (jugadorAnterior.ovr, el nivel de arranque de esa temporada, mismo criterio que
+    // estadísticas/trofeos) y, si clasifica, la corrida de playoffs — que puede pausarse
+    // en la Final pidiendo la jugada final (ver playoffs.ts).
+    if (carrera.fase === 'nba') {
+      const nivelEquipo = nivelEquipoCombinado(nivelClub, jugadorAnterior.ovr)
+      const regular = simularTemporadaRegular(nivelEquipo, azar)
+      resumenTemporada = { ...regular }
+
+      if (regular.clasifico) {
+        const resultado = simularPlayoffs(nivelEquipo, jugadorAnterior.ovr, azar)
+        if (resultado.estado === 'pendiente') {
+          return {
+            ...carrera,
+            jugador,
+            historial,
+            trofeos,
+            resumenTemporada,
+            estadoPlayoffsPendiente: { nivelEquipo, ronda: resultado.ronda, rival: resultado.rival },
+            eventoPendiente: { tipo: 'jugada-final', rival: resultado.rival },
+          }
+        }
+        if (resultado.estado === 'campeon') {
+          trofeos = { ...trofeos, anillos: trofeos.anillos + 1 }
+          resumenTemporada = { ...regular, campeon: true }
+        } else {
+          resumenTemporada = {
+            ...regular,
+            eliminado: { ronda: resultado.ronda, rival: resultado.rival, marcador: resultado.marcador },
+          }
+        }
+      }
+    }
 
     if (jugador.edad >= EDAD_RETIRO) {
-      return { ...carrera, jugador, historial, trofeos, retirado: true, eventoPendiente: null }
+      return { ...carrera, jugador, historial, trofeos, resumenTemporada, retirado: true, eventoPendiente: null }
     }
 
     // El Draft no espera al intervalo de dificultad: se dispara apenas se cruza el
@@ -202,6 +297,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
         jugador,
         historial,
         trofeos,
+        resumenTemporada,
         eventoPendiente: {
           tipo: 'draft',
           opciones: elegirTraspasoOfrecido(equiposNba, jugador.ovr, carrera.clubActual!, azar),
@@ -217,6 +313,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
         jugador,
         historial,
         trofeos,
+        resumenTemporada,
         eventoPendiente: { tipo: 'especializacion', opciones: OPCIONES_ESPECIALIZACION },
       }
     }
@@ -234,7 +331,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
           opciones: elegirTraspasoOfrecido(carrera.poolPreNba, jugador.ovr, carrera.clubActual!, azar),
         }
 
-    return { ...carrera, jugador, historial, trofeos, eventoPendiente }
+    return { ...carrera, jugador, historial, trofeos, resumenTemporada, eventoPendiente }
   }
 
   // fase 'nba': alterna entre evento de trade/agencia libre y decisión de riesgo.
@@ -244,5 +341,5 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       ? { tipo: 'riesgo', decision: generarDecisionRiesgo(azar) }
       : { tipo: 'trade', opciones: elegirTraspasoOfrecido(equiposNba, jugador.ovr, carrera.clubActual!, azar) }
 
-  return { ...carrera, jugador, historial, trofeos, eventoPendiente }
+  return { ...carrera, jugador, historial, trofeos, resumenTemporada, eventoPendiente }
 }

@@ -23,12 +23,13 @@ function azarFijo(valor: number): () => number {
 function resolverPendiente(carrera: Carrera): Carrera {
   if (!carrera.eventoPendiente) return carrera
   if (carrera.eventoPendiente.tipo === 'riesgo') return elegirOpcion(carrera, 'seguro', azarFijo(0.5))
+  if (carrera.eventoPendiente.tipo === 'jugada-final') return elegirOpcion(carrera, 'finta', azarFijo(0.01))
   return elegirOpcion(carrera, carrera.eventoPendiente.opciones[0].id, azarFijo(0.5))
 }
 
 function opcionesDe(carrera: Carrera): { id: string }[] {
   const evento = carrera.eventoPendiente!
-  if (evento.tipo === 'riesgo') throw new Error('evento de riesgo no tiene .opciones')
+  if (evento.tipo === 'riesgo' || evento.tipo === 'jugada-final') throw new Error('este evento no tiene .opciones')
   return evento.opciones
 }
 
@@ -291,5 +292,52 @@ describe('motorCarrera', () => {
 
     expect(comoTriplero.triples).toBeGreaterThan(comoInterior.triples)
     expect(comoTriplero.rpg).toBeLessThan(comoInterior.rpg)
+  })
+
+  it('en fase NBA, avanzar una temporada deja un resumenTemporada con el récord de la temporada regular', () => {
+    let carrera = llegarANba()
+    carrera = avanzarSiCorresponde(carrera, EQUIPOS_NBA, azarFijo(0.99))
+    if (carrera.eventoPendiente?.tipo === 'jugada-final') carrera = resolverPendiente(carrera)
+    expect(carrera.resumenTemporada).not.toBeNull()
+    expect(carrera.resumenTemporada!.victorias + carrera.resumenTemporada!.derrotas).toBe(82)
+  })
+
+  it('en fase pre-nba, no se genera resumenTemporada (los playoffs son solo NBA)', () => {
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5))
+    carrera = avanzarSiCorresponde(carrera, EQUIPOS_NBA, azarFijo(0.9))
+    carrera = resolverPendiente(carrera)
+    expect(carrera.resumenTemporada).toBeNull()
+  })
+
+  it('elegir "finta" en una jugada final ganada suma un anillo real y marca resumenTemporada.campeon', () => {
+    let carrera = llegarANba()
+    carrera = {
+      ...carrera,
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads' },
+      estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
+      resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
+    }
+    const anillosPrevios = carrera.trofeos.anillos
+    carrera = elegirOpcion(carrera, 'finta', azarFijo(0.01)) // 0.01 < 0.62 de probabilidad de éxito -> gana
+    expect(carrera.trofeos.anillos).toBe(anillosPrevios + 1)
+    expect(carrera.resumenTemporada?.campeon).toBe(true)
+    expect(carrera.eventoPendiente).toBeNull()
+    expect(carrera.estadoPlayoffsPendiente).toBeNull()
+  })
+
+  it('elegir "triple" en una jugada final perdida no suma anillo y marca eliminado en esa ronda', () => {
+    let carrera = llegarANba()
+    carrera = {
+      ...carrera,
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads' },
+      estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
+      resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
+    }
+    const anillosPrevios = carrera.trofeos.anillos
+    carrera = elegirOpcion(carrera, 'triple', azarFijo(0.99)) // 0.99 > 0.45 de probabilidad de éxito -> pierde
+    expect(carrera.trofeos.anillos).toBe(anillosPrevios)
+    expect(carrera.resumenTemporada?.eliminado?.ronda).toBe(3)
+    expect(carrera.resumenTemporada?.eliminado?.rival).toBe('Ironclads')
   })
 })

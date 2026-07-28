@@ -18,8 +18,8 @@ describe('avanzarTemporada', () => {
     }
   })
 
-  it('declina en edad avanzada (32+) aunque no haya llegado al potencial', () => {
-    const resultado = avanzarTemporada({ ovr: 70, edad: 33, potencial: 90 }, azarFijo(0.5))
+  it('declina en edad avanzada (35+) aunque no haya llegado al potencial', () => {
+    const resultado = avanzarTemporada({ ovr: 70, edad: 35, potencial: 90 }, azarFijo(0.5))
     expect(resultado.ovr).toBeLessThan(70)
   })
 
@@ -36,8 +36,14 @@ describe('avanzarTemporada', () => {
     expect(resultado.edad).toBe(21)
   })
 
-  it('en meseta (28-31) el cambio es chico, no un salto grande', () => {
-    const resultado = avanzarTemporada({ ovr: 75, edad: 29, potencial: 90 }, azarFijo(0.5))
-    expect(Math.abs(resultado.ovr - 75)).toBeLessThanOrEqual(1)
+  it('en el pico (27-29) todavía puede crecer un poco, no es una meseta chata', () => {
+    const resultado = avanzarTemporada({ ovr: 75, edad: 29, potencial: 90 }, azarFijo(0.99))
+    expect(resultado.ovr).toBeGreaterThan(75)
+    expect(resultado.ovr - 75).toBeLessThanOrEqual(3)
+  })
+
+  it('el declive recién empieza en serio a los 30, no antes', () => {
+    const resultado = avanzarTemporada({ ovr: 75, edad: 30, potencial: 90 }, azarFijo(0.99))
+    expect(resultado.ovr).toBeLessThanOrEqual(76)
   })
 })
