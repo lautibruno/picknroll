@@ -7,24 +7,13 @@
 // El "anillo" real ahora sale de ganar las 3 rondas de playoffs simuladas acá, no de una
 // probabilidad suelta como antes (ver trofeos.ts) — se gana de verdad, jugando.
 import type { Azar } from './potencial'
+import type { Equipo } from './eventos'
 
 export interface RivalFicticio {
+  id: string
   nombre: string
   nivel: number
 }
-
-// Nombres inventados a propósito (no son franquicias NBA reales) — el rival de playoffs
-// es "de relleno", solo para darle marco narrativo a la serie, no un equipo con roster.
-const RIVALES_FICTICIOS: RivalFicticio[] = [
-  { nombre: 'Metro Sharks', nivel: 76 },
-  { nombre: 'Northside Comets', nivel: 79 },
-  { nombre: 'Ironclads', nivel: 81 },
-  { nombre: 'Red River Wolves', nivel: 74 },
-  { nombre: 'Bay City Storm', nivel: 83 },
-  { nombre: 'Frontier Kings', nivel: 78 },
-  { nombre: 'Union Blaze', nivel: 80 },
-  { nombre: 'Coastal Reign', nivel: 84 },
-]
 
 const NOMBRES_RONDA = ['Primera ronda', 'Semifinal', 'Final'] as const
 export const CANTIDAD_RONDAS_PLAYOFFS = NOMBRES_RONDA.length
@@ -67,9 +56,15 @@ export function simularTemporadaRegular(nivelEquipo: number, azar: Azar): Result
   return { victorias, derrotas, clasifico: victorias >= UMBRAL_VICTORIAS_PLAYOFFS }
 }
 
-export function elegirRival(ronda: number, azar: Azar): RivalFicticio {
-  const base = RIVALES_FICTICIOS[Math.floor(azar() * RIVALES_FICTICIOS.length)]
-  return { nombre: base.nombre, nivel: base.nivel + (ronda - 1) * 3 }
+// Rival de playoffs = franquicia real de la misma liga que estás jugando (pedido explícito
+// del usuario: "si estoy jugando con los OKC puedo jugar la final contra un rival real de
+// NBA"), nunca tu propio club ni uno ya enfrentado en una ronda anterior de esta misma
+// tanda de playoffs.
+export function elegirRival(ronda: number, azar: Azar, equiposLiga: Equipo[], excluirIds: string[] = []): RivalFicticio {
+  const elegibles = equiposLiga.filter((equipo) => !excluirIds.includes(equipo.id))
+  const pool = elegibles.length > 0 ? elegibles : equiposLiga
+  const base = pool[Math.floor(azar() * pool.length)]
+  return { id: base.id, nombre: base.nombre, nivel: Math.min(99, base.nivel + (ronda - 1) * 3) }
 }
 
 // Umbral y probabilidad de aparición pensados para que la "jugada final" sea un evento
@@ -121,6 +116,26 @@ function simularSerieBestOf3(
   return { gano: victoriasEquipo === 2, marcador: `${victoriasEquipo}-${victoriasRival}` }
 }
 
+// Escena de la jugada final — al azar toca una de estas (mismo patrón que
+// decisionesRiesgo.ts: variedad narrativa, la mecánica de elegir opción no cambia) — pedido
+// explícito del usuario ("que sea al azar que toque la descripción de una jugada").
+interface EscenaJugadaFinal {
+  titulo: string
+  descripcion: string
+}
+
+const ESCENAS_JUGADA_FINAL: EscenaJugadaFinal[] = [
+  { titulo: 'Últimos segundos', descripcion: 'Quedan 4 segundos y la pelota está en tus manos.' },
+  { titulo: 'Doble marca', descripcion: 'Te cierran con dos defensores, hay que decidir rápido.' },
+  { titulo: 'Cambio de ritmo', descripcion: 'El entrenador rival pide tiempo para armar la defensa.' },
+  { titulo: 'Silencio de visitante', descripcion: 'La cancha rival te grita — un solo tiro define todo.' },
+  { titulo: 'Tu momento', descripcion: 'El resto del equipo ya jugó su parte, ahora depende de vos.' },
+]
+
+function elegirEscenaJugadaFinal(azar: Azar): EscenaJugadaFinal {
+  return ESCENAS_JUGADA_FINAL[Math.floor(azar() * ESCENAS_JUGADA_FINAL.length)]
+}
+
 export type ResultadoPlayoffs =
   | { estado: 'campeon' }
   | { estado: 'eliminado'; ronda: number; rival: string; marcador: string }
@@ -128,11 +143,26 @@ export type ResultadoPlayoffs =
   // decisionesRiesgo.ts: "las cartas ya están sobre la mesa") — así la UI puede mostrar
   // un revelado en vivo fiel a lo que en verdad va a pasar, en vez de tirar un dado nuevo
   // cuando el jugador elige, que podía no coincidir con lo que la animación mostraba.
-  | { estado: 'pendiente'; ronda: number; rival: string; resultadoSiFinta: boolean; resultadoSiTriple: boolean }
+  | {
+      estado: 'pendiente'
+      ronda: number
+      rival: string
+      escena: EscenaJugadaFinal
+      resultadoSiFinta: boolean
+      resultadoSiTriple: boolean
+    }
 
-export function simularPlayoffs(nivelEquipo: number, ovrJugador: number, azar: Azar): ResultadoPlayoffs {
+export function simularPlayoffs(
+  nivelEquipo: number,
+  ovrJugador: number,
+  azar: Azar,
+  equiposLiga: Equipo[],
+  clubActualId: string | null,
+): ResultadoPlayoffs {
+  const rivalesEnfrentados: string[] = clubActualId ? [clubActualId] : []
   for (let ronda = 1; ronda <= CANTIDAD_RONDAS_PLAYOFFS; ronda++) {
-    const rival = elegirRival(ronda, azar)
+    const rival = elegirRival(ronda, azar, equiposLiga, rivalesEnfrentados)
+    rivalesEnfrentados.push(rival.id)
     const esFinal = ronda === CANTIDAD_RONDAS_PLAYOFFS
     const resultado = simularSerieBestOf3(nivelEquipo, rival.nivel, azar, esFinal, ovrJugador)
 
@@ -141,6 +171,7 @@ export function simularPlayoffs(nivelEquipo: number, ovrJugador: number, azar: A
         estado: 'pendiente',
         ronda,
         rival: rival.nombre,
+        escena: elegirEscenaJugadaFinal(azar),
         resultadoSiFinta: resolverJugadaFinal('finta', azar),
         resultadoSiTriple: resolverJugadaFinal('triple', azar),
       }

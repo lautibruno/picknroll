@@ -7,7 +7,7 @@ function azarFijo(valor: number): () => number {
 
 // Edad neutra (no cae en año de Mundial ni de JJOO) para no ensuciar los tests que solo
 // quieren probar All-Star/MVP — ver evaluarTrofeosTemporada para el criterio del ciclo.
-const EDAD_NEUTRA = 25
+const EDAD_NEUTRA = 27
 
 describe('evaluarTrofeosTemporada', () => {
   it('fuera de la NBA no otorga ningún trofeo', () => {
@@ -47,8 +47,8 @@ describe('evaluarTrofeosTemporada', () => {
     expect(fueraDeAnio.ganados.mundial).toBe(false)
   })
 
-  it('JJOO solo puede tocar en su propio ciclo de 4 años, desfasado del Mundial', () => {
-    const enAnio = evaluarTrofeosTemporada(TROFEOS_INICIALES, 85, 26, 'nba', azarFijo(0))
+  it('JJOO cae la temporada siguiente al Mundial (calendario real: no equidistante)', () => {
+    const enAnio = evaluarTrofeosTemporada(TROFEOS_INICIALES, 85, 25, 'nba', azarFijo(0))
     const fueraDeAnio = evaluarTrofeosTemporada(TROFEOS_INICIALES, 85, 24, 'nba', azarFijo(0))
     expect(enAnio.ganados.jjoo).toBe(true)
     expect(fueraDeAnio.ganados.jjoo).toBe(false)

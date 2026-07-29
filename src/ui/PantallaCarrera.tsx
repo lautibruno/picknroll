@@ -302,9 +302,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                     className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 hover:bg-superficie"
                   >
                     <span className="font-titulo text-sm font-semibold uppercase sm:text-base">Competir</span>
-                    <span className="font-mono-stats text-[9px] text-hueso/50">
-                      {Math.round(evento.decision.probabilidadExito * 100)}% titular
-                    </span>
+                    <span className="font-mono-stats text-[9px] text-hueso/50">ir por la titularidad</span>
                   </button>
                   <button
                     type="button"
@@ -360,7 +358,8 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
               <>
                 <div className="px-3 py-2 sm:px-4 sm:py-3">
                   <div className="font-mono-stats text-[9px] tracking-[0.1em] text-acento">FINAL vs {evento.rival.toUpperCase()}</div>
-                  <div className="font-titulo text-base font-bold uppercase leading-tight sm:text-lg">Jugada final</div>
+                  <div className="font-titulo text-base font-bold uppercase leading-tight sm:text-lg">{evento.escenaTitulo}</div>
+                  <div className="mt-0.5 font-titulo text-xs font-light text-hueso/60 sm:text-sm">{evento.escenaDescripcion}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
                   {OPCIONES_JUGADA_FINAL.map((opcion) => (
@@ -371,7 +370,6 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
                       className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 hover:bg-superficie"
                     >
                       <span className="font-titulo text-sm font-semibold uppercase sm:text-base">{opcion.nombre}</span>
-                      <span className="font-mono-stats text-[9px] text-hueso/50">{Math.round(opcion.probabilidadExito * 100)}% éxito</span>
                     </button>
                   ))}
                 </div>

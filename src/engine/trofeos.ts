@@ -33,19 +33,19 @@ const UMBRAL_OVR_ALL_STAR = 80
 const UMBRAL_OVR_MVP = 90
 const PROBABILIDAD_MVP_SI_ELEGIBLE = 0.3
 
-// Mundial de selecciones (FIBA) — cada 4 años en la realidad, acá simplificado a "una de
-// cada cuatro temporadas" usando la edad como reloj determinista (no depende de un azar
-// extra para decidir SI toca el año, solo si te convocan ESE año).
+// Mundial de selecciones (FIBA) y JJOO — pedido explícito del usuario: "el tiempo de
+// separación... tiene que ser calculado real. No se juega todos los años". Calendario real:
+// ambos son cada 4 años, pero NO equidistantes entre sí — el Mundial cae un año antes que
+// los Juegos Olímpicos siguientes (ej. Mundial 2019 → JJOO 2020, Mundial 2023 → JJOO 2024),
+// y después hay un hueco de 3 temporadas sin ninguno de los dos. Se modela con la edad como
+// reloj determinista de 4 temporadas: año de Mundial = edad % 4 === 0, año de JJOO = la
+// temporada siguiente (edad % 4 === 1) — no separados 2 y 2 como antes.
 const UMBRAL_OVR_MUNDIAL = 78
 const PROBABILIDAD_MUNDIAL_SI_ELEGIBLE = 0.35
-const CICLO_MUNDIAL_TEMPORADAS = 4
+const CICLO_TORNEOS_TEMPORADAS = 4
 
-// Juegos Olímpicos — mismo ciclo de 4 años, corrido 2 temporadas respecto al Mundial para
-// que no coincidan siempre el mismo año (más variedad de carteles a lo largo de la carrera).
 const UMBRAL_OVR_JJOO = 82
 const PROBABILIDAD_JJOO_SI_ELEGIBLE = 0.25
-const CICLO_JJOO_TEMPORADAS = 4
-const DESFASE_JJOO_TEMPORADAS = 2
 
 export interface ResultadoTrofeosTemporada {
   trofeos: Trofeos
@@ -63,9 +63,9 @@ export function evaluarTrofeosTemporada(
 
   const ganaAllStar = ovr >= UMBRAL_OVR_ALL_STAR
   const ganaMvp = ovr >= UMBRAL_OVR_MVP && azar() < PROBABILIDAD_MVP_SI_ELEGIBLE
-  const esAnioMundial = edad % CICLO_MUNDIAL_TEMPORADAS === 0
+  const esAnioMundial = edad % CICLO_TORNEOS_TEMPORADAS === 0
   const ganaMundial = esAnioMundial && ovr >= UMBRAL_OVR_MUNDIAL && azar() < PROBABILIDAD_MUNDIAL_SI_ELEGIBLE
-  const esAnioJjoo = (edad + DESFASE_JJOO_TEMPORADAS) % CICLO_JJOO_TEMPORADAS === 0
+  const esAnioJjoo = edad % CICLO_TORNEOS_TEMPORADAS === 1
   const ganaJjoo = esAnioJjoo && ovr >= UMBRAL_OVR_JJOO && azar() < PROBABILIDAD_JJOO_SI_ELEGIBLE
 
   return {

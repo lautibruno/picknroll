@@ -345,7 +345,7 @@ describe('motorCarrera', () => {
     let carrera = llegarANba()
     carrera = {
       ...carrera,
-      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', resultadoSiFinta: true, resultadoSiTriple: false },
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', escenaTitulo: 'Últimos segundos', escenaDescripcion: 'Test.', resultadoSiFinta: true, resultadoSiTriple: false },
       estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
       resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
     }
@@ -368,7 +368,7 @@ describe('motorCarrera', () => {
     let carrera = llegarANba()
     carrera = {
       ...carrera,
-      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', resultadoSiFinta: true, resultadoSiTriple: false },
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', escenaTitulo: 'Últimos segundos', escenaDescripcion: 'Test.', resultadoSiFinta: true, resultadoSiTriple: false },
       estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
       resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
     }

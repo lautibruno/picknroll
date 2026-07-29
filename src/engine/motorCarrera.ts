@@ -51,7 +51,14 @@ export type EventoPendiente =
   // resultadoSiFinta/resultadoSiTriple ya están resueltos al generar el evento (ver
   // playoffs.ts) — la UI puede mostrar un revelado en vivo fiel a lo que va a pasar de
   // verdad, sin tirar un dado nuevo cuando el jugador elige.
-  | { tipo: 'jugada-final'; rival: string; resultadoSiFinta: boolean; resultadoSiTriple: boolean }
+  | {
+      tipo: 'jugada-final'
+      rival: string
+      escenaTitulo: string
+      escenaDescripcion: string
+      resultadoSiFinta: boolean
+      resultadoSiTriple: boolean
+    }
 
 // Íconos de trofeo/convocatoria a mostrar en el historial (pedido explícito del usuario:
 // "figurar como iconos reales de copas pequeñas en la lista de equipos en la temporada
@@ -371,12 +378,14 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       resumenTemporada = { ...regular }
 
       if (regular.clasifico) {
-        const resultado = simularPlayoffs(nivelEquipo, jugadorAnterior.ovr, azar)
+        const resultado = simularPlayoffs(nivelEquipo, jugadorAnterior.ovr, azar, equiposNba, carrera.clubActual?.id ?? null)
         if (resultado.estado === 'pendiente') {
           return conProximaDecision(
             {
               tipo: 'jugada-final',
               rival: resultado.rival,
+              escenaTitulo: resultado.escena.titulo,
+              escenaDescripcion: resultado.escena.descripcion,
               resultadoSiFinta: resultado.resultadoSiFinta,
               resultadoSiTriple: resultado.resultadoSiTriple,
             },
