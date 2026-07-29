@@ -14,7 +14,9 @@ interface IconoProps {
 
 const URL_ANILLO = 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Larry_O%27Brien_Championship_Trophy_icon.svg'
 const URL_MUNDIAL = 'https://upload.wikimedia.org/wikipedia/commons/0/07/FIBA_Basketball_World_Cup_logo.svg'
-const URL_JJOO = 'https://upload.wikimedia.org/wikipedia/commons/5/5c/Olympic_rings_without_rims.svg'
+// Medalla de oro real (no los aros olímpicos, que son el logo del evento, no el premio en sí
+// — pedido explícito del usuario: "si es oro olímpico, medalla olímpica").
+const URL_JJOO = 'https://upload.wikimedia.org/wikipedia/commons/4/4f/Gold_medal_olympic.svg'
 
 export function IconoAnillo({ className }: IconoProps) {
   return <img src={URL_ANILLO} alt="Trofeo de campeón" className={`object-contain ${className ?? ''}`} />
@@ -42,7 +44,7 @@ export function IconoMundial({ className }: IconoProps) {
 }
 
 export function IconoJjoo({ className }: IconoProps) {
-  return <img src={URL_JJOO} alt="Aros olímpicos" className={`object-contain ${className ?? ''}`} />
+  return <img src={URL_JJOO} alt="Medalla de oro olímpica" className={`object-contain ${className ?? ''}`} />
 }
 
 export const ICONOS_TROFEO: Record<IconoTrofeo, (props: IconoProps) => ReactElement> = {
@@ -59,4 +61,14 @@ export const ETIQUETA_TROFEO: Record<IconoTrofeo, string> = {
   mvp: 'MVP',
   mundial: 'Mundial',
   jjoo: 'JJOO',
+}
+
+// Descripción para la vitrina de fin de carrera (pedido explícito del usuario: "cuando pasas
+// el mouse o lo tocas con el dedo te da la descripción de que es el trofeo").
+export const DESCRIPCION_TROFEO: Record<IconoTrofeo, string> = {
+  anillo: 'Campeón de la NBA — Trofeo Larry O’Brien, ganado en los playoffs.',
+  allstar: 'Convocado al All-Star Game de la NBA por tu nivel esa temporada.',
+  mvp: 'Jugador Más Valioso de la temporada regular de la NBA.',
+  mundial: 'Convocado a la selección para el Mundial de básquet (FIBA).',
+  jjoo: 'Convocado a la selección para los Juegos Olímpicos.',
 }
