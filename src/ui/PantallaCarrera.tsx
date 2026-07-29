@@ -51,11 +51,12 @@ function OvrAnimado({ objetivo, inicial }: { objetivo: number; inicial: number }
   const mostrado = useNumeroAnimado(objetivo, inicial)
   const color = colorPorOvr(mostrado)
   const elite = esNivelElite(mostrado)
+  // Animación distinta si el OVR sube o baja (pedido explícito del usuario), no un pop
+  // genérico igual para los dos casos — ver ovr-glow-sube/ovr-glow-baja en index.css.
+  const claseDireccion = objetivo > inicial ? 'animar-ovr-sube' : objetivo < inicial ? 'animar-ovr-baja' : ''
   return (
     <div
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border-2 border-hueso font-marcador text-xl leading-none sm:h-14 sm:w-14 sm:text-2xl ${
-        objetivo !== inicial ? 'animar-ovr' : ''
-      }`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border-2 border-hueso font-marcador text-xl leading-none sm:h-14 sm:w-14 sm:text-2xl ${claseDireccion}`}
       style={{ color, backgroundColor: `${color}22`, boxShadow: elite ? `0 0 14px ${color}88` : 'none' }}
     >
       {mostrado}
@@ -199,7 +200,9 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
             {hayCambioPrevio && diferenciaOvr !== 0 && (
               <span
                 key={`${carrera.historial.length}-delta`}
-                className={`animar-delta ml-auto font-titulo text-xs font-bold sm:text-sm ${diferenciaOvr > 0 ? 'text-en-vivo' : 'text-hueso/60'}`}
+                className={`ml-auto font-titulo text-xs font-bold sm:text-sm ${
+                  diferenciaOvr > 0 ? 'animar-delta text-en-vivo' : 'animar-delta-baja text-baja'
+                }`}
               >
                 {diferenciaOvr > 0 ? '+' : ''}
                 {diferenciaOvr}

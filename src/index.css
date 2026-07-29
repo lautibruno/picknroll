@@ -10,6 +10,7 @@
   --color-acento: #ff6b1a;
   --color-hueso: #f5f1e8;
   --color-en-vivo: #4ade80;
+  --color-baja: #f87171;
 
   --font-marcador: 'Bebas Neue', sans-serif;
   --font-titulo: 'Oswald', sans-serif;
@@ -78,6 +79,29 @@ body {
 }
 .animar-ovr {
   animation: ovr-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Destello de color sobre el pop, según suba o baje el OVR — pedido explícito del usuario:
+   "que tenga una animación de aumento. O animación de bajada." */
+@keyframes ovr-glow-sube {
+  0% { box-shadow: 0 0 0 rgba(74, 222, 128, 0); }
+  40% { box-shadow: 0 0 22px rgba(74, 222, 128, 0.85); }
+  100% { box-shadow: 0 0 0 rgba(74, 222, 128, 0); }
+}
+@keyframes ovr-glow-baja {
+  0% { box-shadow: 0 0 0 rgba(248, 113, 113, 0); }
+  40% { box-shadow: 0 0 22px rgba(248, 113, 113, 0.85); }
+  100% { box-shadow: 0 0 0 rgba(248, 113, 113, 0); }
+}
+.animar-ovr-sube {
+  animation:
+    ovr-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    ovr-glow-sube 0.9s ease-out;
+}
+.animar-ovr-baja {
+  animation:
+    ovr-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    ovr-glow-baja 0.9s ease-out;
 }
 
 @keyframes chip-entrada {
@@ -156,6 +180,15 @@ body {
 }
 .animar-delta {
   animation: delta-pop 1.6s ease-out forwards;
+}
+@keyframes delta-pop-baja {
+  0% { opacity: 0; transform: translate(-50%, 30%) scale(0.5); }
+  25% { opacity: 1; transform: translate(-50%, 50%) scale(1.18); }
+  75% { opacity: 1; transform: translate(-50%, 50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 68%) scale(1); }
+}
+.animar-delta-baja {
+  animation: delta-pop-baja 1.6s ease-out forwards;
 }
 
 /* Grano sutil — ruido de fondo, no plano perfecto */
