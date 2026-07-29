@@ -1,24 +1,23 @@
 import type { ReactElement } from 'react'
 import type { IconoTrofeo } from '../engine/motorCarrera'
 
-// Íconos schematic/monocromáticos (no logos oficiales de ninguna federación real) para
-// cada trofeo/convocatoria — pedido explícito del usuario: "iconos reales de las copas",
-// interpretado como "que se reconozcan de un vistazo qué representan", no artwork con
-// marca registrada (mismo criterio de riesgo ya aceptado en el proyecto para crests reales
-// de clubes, pero acá directamente dibujamos formas propias para evitar cualquier duda).
+// Campeón/Mundial/JJOO usan íconos REALES (pedido explícito del usuario: "iconos reales de
+// las copas... que me los busques y recuperes, no que los inventes vos") — imágenes oficiales
+// de dominio público / CC alojadas en Wikimedia Commons, mismo criterio que ya usa el proyecto
+// para escudos reales de clubes vía Wikipedia/ESPN. MVP y All-Star quedan con ícono dibujado
+// propio porque no existe en Wikimedia Commons un trofeo/logo libre y estable para ellos (el
+// trofeo Michael Jordan y los logos de All-Star Game son artwork comercial protegido que
+// cambia cada año, no hay una versión de dominio público reutilizable).
 interface IconoProps {
   className?: string
 }
 
+const URL_ANILLO = 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Larry_O%27Brien_Championship_Trophy_icon.svg'
+const URL_MUNDIAL = 'https://upload.wikimedia.org/wikipedia/commons/0/07/FIBA_Basketball_World_Cup_logo.svg'
+const URL_JJOO = 'https://upload.wikimedia.org/wikipedia/commons/5/5c/Olympic_rings_without_rims.svg'
+
 export function IconoAnillo({ className }: IconoProps) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2}>
-      <path d="M7 3h10l-1.5 6h-7z" />
-      <path d="M8.5 9c-3 1-4 3.2-2.2 5.4C7.6 16 9.5 17 12 17s4.4-1 5.7-2.6C19.5 12.2 18.5 10 15.5 9" />
-      <path d="M12 17v3" />
-      <path d="M8.5 20h7" />
-    </svg>
-  )
+  return <img src={URL_ANILLO} alt="Trofeo de campeón" className={`object-contain ${className ?? ''}`} />
 }
 
 export function IconoAllStar({ className }: IconoProps) {
@@ -39,26 +38,11 @@ export function IconoMvp({ className }: IconoProps) {
 }
 
 export function IconoMundial({ className }: IconoProps) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2}>
-      <circle cx="12" cy="11" r="7" />
-      <path d="M5 11h14M12 4c2 2 3 4.5 3 7s-1 5-3 7c-2-2-3-4.5-3-7s1-5 3-7z" />
-      <path d="M9 20h6" />
-      <path d="M12 17v3" />
-    </svg>
-  )
+  return <img src={URL_MUNDIAL} alt="Logo del Mundial FIBA" className={`object-contain ${className ?? ''}`} />
 }
 
 export function IconoJjoo({ className }: IconoProps) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <circle cx="6" cy="15" r="3.2" />
-      <circle cx="12" cy="15" r="3.2" />
-      <circle cx="18" cy="15" r="3.2" />
-      <circle cx="9" cy="9" r="3.2" />
-      <circle cx="15" cy="9" r="3.2" />
-    </svg>
-  )
+  return <img src={URL_JJOO} alt="Aros olímpicos" className={`object-contain ${className ?? ''}`} />
 }
 
 export const ICONOS_TROFEO: Record<IconoTrofeo, (props: IconoProps) => ReactElement> = {
