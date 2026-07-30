@@ -19,12 +19,24 @@ import type { Equipo } from '../eventos'
 
 export interface LigaDomestica {
   nombreLiga: string
+  // Imagen del título de esa liga, para la vitrina de fin de carrera (pedido explícito del
+  // usuario: "el trofeo debe ser el REAL de la liga en la que estoy jugando"). Se buscó una
+  // foto del trofeo físico real para las 10 ligas: solo existe con licencia usable para ACB
+  // (España) y NBL (Australia). Para el resto se usa el LOGO OFICIAL real de la liga —
+  // decisión confirmada con el usuario ("trofeo real donde exista + logo si no"), misma
+  // fuente y criterio que los escudos reales de club de este archivo.
+  trofeoUrl: string
+  // true = es la copa física real; false = es el logo oficial de la liga. Lo usa la UI para
+  // no llamarle "trofeo" a algo que en realidad es un logo.
+  trofeoEsCopaReal: boolean
   clubes: Equipo[]
 }
 
 export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   ar: {
     nombreLiga: 'Liga Nacional de Básquet (Argentina)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/a/a0/LNB_Argentina_Logo.svg',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'ar-quimsa', nombre: 'Quimsa (Santiago del Estero)', nivel: 60, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/2/2c/Asociaci%C3%B3n_Atl%C3%A9tica_Quimsa_logo.svg/120px-Asociaci%C3%B3n_Atl%C3%A9tica_Quimsa_logo.svg.png' },
       { id: 'ar-regatas', nombre: 'Regatas Corrientes', nivel: 58, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/9/9f/Crc_regatas.png' },
@@ -40,6 +52,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   es: {
     nombreLiga: 'Liga ACB (España)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/62/ACB_Trophy.png',
+    trofeoEsCopaReal: true,
     clubes: [
       { id: 'es-real-madrid', nombre: 'Real Madrid', nivel: 68, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/b/be/Real_Madrid_Baloncesto.png' },
       { id: 'es-barcelona', nombre: 'FC Barcelona', nivel: 66, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/4/47/FC_Barcelona_%28crest%29.svg/250px-FC_Barcelona_%28crest%29.svg.png' },
@@ -53,6 +67,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   it: {
     nombreLiga: 'Lega Basket Serie A (Italia)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/9/9d/LegaBasket_Serie_A_Logo.png',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'it-olimpia-milano', nombre: 'Olimpia Milano', nivel: 65, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Pallacanestro_Olimpia_Milano_logo.svg/120px-Pallacanestro_Olimpia_Milano_logo.svg.png' },
       { id: 'it-virtus-bologna', nombre: 'Virtus Bologna', nivel: 62, escudoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Virtus_Bologna_logo.svg/250px-Virtus_Bologna_logo.svg.png' },
@@ -66,6 +82,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   gr: {
     nombreLiga: 'Greek Basket League (Grecia)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/f/fc/Greek_Basket_League_Logo.jpg',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'gr-panathinaikos', nombre: 'Panathinaikos', nivel: 66, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/1/18/Panathinaikos_BC_logo.svg/330px-Panathinaikos_BC_logo.svg.png' },
       { id: 'gr-olympiacos', nombre: 'Olympiacos', nivel: 65, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/7/7f/Olympiacos_BC_logo.svg/250px-Olympiacos_BC_logo.svg.png' },
@@ -77,6 +95,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   rs: {
     nombreLiga: 'KLS / ABA Liga (Serbia)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/4/47/Basketball_League_of_Serbia_logo.png',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'rs-zvezda', nombre: 'Crvena Zvezda (Estrella Roja)', nivel: 64, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/01/KK_Crvena_zvezda_logo.svg/250px-KK_Crvena_zvezda_logo.svg.png' },
       { id: 'rs-partizan', nombre: 'Partizan', nivel: 63, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/80/KK_Partizan_logo.svg/250px-KK_Partizan_logo.svg.png' },
@@ -87,6 +107,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   tr: {
     nombreLiga: 'Basketbol Süper Ligi (Turquía)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/e/e0/Official_logo_of_the_Turkish_Basketball_Super_League.png',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'tr-fenerbahce', nombre: 'Fenerbahçe', nivel: 64, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/0b/Fenerbah%C3%A7e_Men%27s_Basketball_logo.svg/250px-Fenerbah%C3%A7e_Men%27s_Basketball_logo.svg.png' },
       { id: 'tr-anadolu-efes', nombre: 'Anadolu Efes', nivel: 63, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/7/74/Anadolu_Efes_SK_logo.svg/250px-Anadolu_Efes_SK_logo.svg.png' },
@@ -97,6 +119,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   fr: {
     nombreLiga: 'Betclic Élite (Francia)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/2/2d/Betclic_%C3%89lite.png',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'fr-monaco', nombre: 'AS Monaco', nivel: 60, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/AS_Monaco_Basket.svg/250px-AS_Monaco_Basket.svg.png' },
       { id: 'fr-asvel', nombre: 'ASVEL Lyon-Villeurbanne', nivel: 58 },
@@ -109,6 +133,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   au: {
     nombreLiga: 'NBL (Australia)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/bd/2016-17_NBL_championship_trophy.jpg',
+    trofeoEsCopaReal: true,
     clubes: [
       { id: 'au-perth', nombre: 'Perth Wildcats', nivel: 56, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/5/50/Perth_Wildcats.png' },
       { id: 'au-melbourne-united', nombre: 'Melbourne United', nivel: 55, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/4/40/Melbourne_United_Primary_Logo_2024.png' },
@@ -121,6 +147,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   lt: {
     nombreLiga: 'LKL (Lituania)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/commons/5/5e/Betsson_LKL.svg',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'lt-zalgiris', nombre: 'Žalgiris Kaunas', nivel: 62, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/0e/BC_%C5%BDalgiris_logo.svg/330px-BC_%C5%BDalgiris_logo.svg.png' },
       { id: 'lt-rytas', nombre: 'Rytas Vilnius', nivel: 52, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/BC_Rytas_logo.svg/330px-BC_Rytas_logo.svg.png' },
@@ -130,6 +158,8 @@ export const LIGAS_POR_PAIS: Record<string, LigaDomestica> = {
   },
   br: {
     nombreLiga: 'NBB (Brasil)',
+    trofeoUrl: 'https://upload.wikimedia.org/wikipedia/en/f/ff/Novo_Basquete_Brasil_logo_%282022%29.svg',
+    trofeoEsCopaReal: false,
     clubes: [
       { id: 'br-flamengo', nombre: 'Flamengo', nivel: 58, escudoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Clube_de_Regatas_do_Flamengo_logo.svg/500px-Clube_de_Regatas_do_Flamengo_logo.svg.png' },
       { id: 'br-franca', nombre: 'Franca Basquete', nivel: 55, escudoUrl: 'https://upload.wikimedia.org/wikipedia/en/7/75/Franca_basquete_logo.png' },

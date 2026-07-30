@@ -5,9 +5,15 @@ import { colorPorOvr, esNivelElite } from './colorOvr'
 import { calcularValorMercadoEuros, formatoValorMercado } from '../engine/valorMercado'
 import { useNumeroAnimado } from './useNumeroAnimado'
 import { OPCIONES_JUGADA_FINAL, nombreRonda } from '../engine/playoffs'
-import { ICONOS_TROFEO, ETIQUETA_TROFEO } from './iconosTrofeos'
+import { OPCIONES_CONVOCATORIA } from '../engine/convocatorias'
+import { ICONOS_TROFEO, ETIQUETA_TROFEO, IconoLigaLocal } from './iconosTrofeos'
 
 const DURACION_CARTEL_TROFEOS_MS = 2800
+
+// Ritmo entre decisiones (pedido explícito del usuario: "debe haber un poco más de lentitud y
+// animación... debe incrementar con animación de subida de números de forma lenta y luego de
+// subir, que aparezcan las opciones"). El OVR anima primero y las opciones entran después.
+const DEMORA_OPCIONES_MS = 1100
 
 const CLAVE_TROFEO = {
   anillo: 'anillos',
@@ -15,6 +21,7 @@ const CLAVE_TROFEO = {
   mvp: 'mvp',
   mundial: 'mundial',
   jjoo: 'jjoo',
+  'liga-local': 'ligaLocal',
 } as const
 
 // Dashboard único y continuo, densidad estilo copero.com.ar/juegos/simulador-carrera
@@ -26,6 +33,7 @@ const CLAVE_TROFEO = {
 interface PantallaCarreraProps {
   carrera: Carrera
   onElegir: (opcionId: string) => void
+  onContinuar: () => void
 }
 
 const TITULOS_EVENTO: Record<string, string> = {
@@ -99,7 +107,7 @@ function useRevelado(onTerminar: () => void) {
   return { destacado, revelando: destacado !== null, iniciar }
 }
 
-export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
+export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarreraProps) {
   const [clubBloqueado, setClubBloqueado] = useState(false)
   const historialReciente = carrera.historial.slice(-8)
   const diferenciaOvr = carrera.ultimoCambioOvr
@@ -107,6 +115,7 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
   const resultadoRiesgo = carrera.ultimoResultadoRiesgo
   const resumen = carrera.resumenTemporada
   const evento = carrera.eventoPendiente
+  const desenlace = carrera.desenlacePendiente
 
   const revelado = useRevelado(() => {
     if (evento?.tipo === 'riesgo') onElegir('arriesgar')
@@ -114,7 +123,21 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
   const reveladoFinal = useRevelado(() => {
     if (evento?.tipo === 'jugada-final') onElegir(opcionJugadaFinalPendiente.current)
   })
+  const reveladoConvocatoria = useRevelado(() => {
+    if (evento?.tipo === 'convocatoria') onElegir(opcionConvocatoriaPendiente.current)
+  })
   const opcionJugadaFinalPendiente = useRef<string>('finta')
+  const opcionConvocatoriaPendiente = useRef<string>('jugar-para-el-equipo')
+
+  // Ritmo (pedido del usuario, punto 6): al resolver una decisión el OVR anima primero y las
+  // opciones nuevas recién aparecen después. Se dispara con cada evento nuevo.
+  const [opcionesVisibles, setOpcionesVisibles] = useState(true)
+  useEffect(() => {
+    if (!evento) return
+    setOpcionesVisibles(false)
+    const t = setTimeout(() => setOpcionesVisibles(true), DEMORA_OPCIONES_MS)
+    return () => clearTimeout(t)
+  }, [evento])
 
   // El dashboard ya no se desmonta entre decisiones — sin este reset, el bloqueo de las
   // tarjetas de club quedaba pegado a la decisión anterior (bug real encontrado jugando).
@@ -122,35 +145,32 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
     setClubBloqueado(false)
   }, [evento])
 
-  // Cartel de festejo — pedido explícito del usuario: "cuando salís campeón/te convocan a
-  // All-Star/Mundial/JJOO/ganás MVP debe aparecer un cartel por un pequeño momento". Se
-  // detectan trofeos nuevos de dos formas: los que vienen en filas de historial recién
-  // agregadas (All-Star/MVP/Mundial/JJOO, ver motorCarrera.ts) y el conteo de anillos, que
-  // puede subir SIN agregar una fila nueva (el anillo se marca retroactivo en una fila ya
-  // existente cuando se gana la Final vía jugada final).
-  const previoRef = useRef({ historialLen: carrera.historial.length, anillos: carrera.trofeos.anillos })
+  // Cartel de festejo breve para los premios INDIVIDUALES (All-Star y MVP), que se otorgan
+  // solos al simular la temporada. Los TÍTULOS (anillo, Mundial, JJOO, liga local) ya no
+  // pasan por acá: cada uno frena la carrera con su propio desenlace (ver `Desenlace` en
+  // motorCarrera.ts), así no aparecen de refilón pegados a otra cosa.
+  const previoRef = useRef(carrera.historial.length)
   const [cartelTrofeos, setCartelTrofeos] = useState<IconoTrofeo[] | null>(null)
   useEffect(() => {
     const previo = previoRef.current
     const nuevos: IconoTrofeo[] = []
-    if (carrera.historial.length > previo.historialLen) {
-      for (const entrada of carrera.historial.slice(previo.historialLen)) {
+    if (carrera.historial.length > previo) {
+      for (const entrada of carrera.historial.slice(previo)) {
         for (const t of entrada.trofeosGanados) {
-          if (t !== 'anillo') nuevos.push(t)
+          if (t === 'allstar' || t === 'mvp') nuevos.push(t)
         }
       }
     }
-    if (carrera.trofeos.anillos > previo.anillos) nuevos.push('anillo')
-    previoRef.current = { historialLen: carrera.historial.length, anillos: carrera.trofeos.anillos }
+    previoRef.current = carrera.historial.length
 
     if (nuevos.length > 0) {
       setCartelTrofeos(nuevos)
       const t = setTimeout(() => setCartelTrofeos(null), DURACION_CARTEL_TROFEOS_MS)
       return () => clearTimeout(t)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe reaccionar a que
-    // cambien la CANTIDAD de temporadas/anillos, no cada vez que el array se recrea
-  }, [carrera.historial.length, carrera.trofeos.anillos])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe reaccionar a que cambie
+    // la CANTIDAD de temporadas, no cada vez que el array se recrea
+  }, [carrera.historial.length])
 
   function elegirClub(opcionId: string) {
     if (clubBloqueado) return
@@ -172,6 +192,16 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
     reveladoFinal.iniciar(exito ? 'a' : 'b')
   }
 
+  function jugarConvocatoria(opcionId: string) {
+    if (evento?.tipo !== 'convocatoria') return
+    const exito =
+      opcionId === 'tomar-la-responsabilidad'
+        ? evento.decision.resultadoSiResponsabilidad
+        : evento.decision.resultadoSiEquipo
+    opcionConvocatoriaPendiente.current = opcionId
+    reveladoConvocatoria.iniciar(exito ? 'a' : 'b')
+  }
+
   return (
     <div className="mx-auto max-w-2xl border-2 border-hueso/15 bg-fondo">
       {cartelTrofeos && (
@@ -189,6 +219,48 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
           </div>
         </div>
       )}
+
+      {/* Desenlace de un título/torneo — la carrera espera acá hasta que el jugador continúa
+          (ver `Desenlace` en motorCarrera.ts). Es el fix del bug de "erré el tiro pero salí
+          campeón igual": el resultado de TU jugada se ve solo, sin la temporada siguiente
+          encimada. */}
+      {desenlace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-fondo/90 p-6">
+          <div className="animar-trofeo sombra-brutal w-full max-w-sm border-2 border-hueso bg-superficie-alta px-6 py-7 text-center">
+            {desenlace.iconos.length > 0 && (
+              <div className="mb-4 flex justify-center gap-3">
+                {desenlace.iconos.map((t, i) =>
+                  t === 'liga-local' ? (
+                    <IconoLigaLocal key={i} className="h-16 w-16" url={carrera.ligaDomestica?.trofeoUrl} />
+                  ) : (
+                    (() => {
+                      const Icono = ICONOS_TROFEO[t]
+                      return <Icono key={i} className="h-16 w-16 text-acento" />
+                    })()
+                  ),
+                )}
+              </div>
+            )}
+            <div
+              className="font-marcador text-4xl leading-none sm:text-5xl"
+              style={{ color: desenlace.gano ? 'var(--color-acento)' : 'var(--color-hueso)' }}
+            >
+              {desenlace.titulo.toUpperCase()}
+            </div>
+            <p className="mx-auto mt-3 max-w-xs font-titulo text-sm font-light leading-relaxed text-hueso/75">
+              {desenlace.texto}
+            </p>
+            <button
+              type="button"
+              onClick={onContinuar}
+              className="mt-6 w-full bg-acento px-4 py-3 font-titulo text-sm font-semibold uppercase tracking-[0.14em] text-fondo"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header compacto de una sola franja — OVR/valor/edad/equipo, sin bloques gigantes. */}
       <div className="flex items-center gap-2 border-b-2 border-hueso px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
         <OvrAnimado key={carrera.historial.length} objetivo={carrera.jugador.ovr} inicial={carrera.jugador.ovr - diferenciaOvr} />
@@ -271,8 +343,17 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
         </div>
       )}
 
+      {/* Ritmo: mientras el OVR termina de subir/bajar, en vez de las opciones se ve que la
+          temporada se está jugando (pedido del usuario, punto 6). */}
+      {evento && !opcionesVisibles && (
+        <div className="flex items-center justify-center gap-2 border-b-2 border-hueso/15 px-3 py-8">
+          <span className="animar-latido h-2 w-2 bg-acento" />
+          <span className="font-mono-stats text-[10px] tracking-[0.18em] text-hueso/50">JUGANDO LA TEMPORADA…</span>
+        </div>
+      )}
+
       {/* Panel de decisión pendiente. */}
-      {evento && (
+      {evento && opcionesVisibles && (
         <div className="border-b-2 border-hueso/15">
           {evento.tipo === 'riesgo' &&
             (revelado.revelando ? (
@@ -379,6 +460,52 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
               </>
             ))}
 
+          {/* Mundial / JJOO — ganarlos depende de esta decisión (pedido del usuario, punto 7). */}
+          {evento.tipo === 'convocatoria' &&
+            (reveladoConvocatoria.revelando ? (
+              <div className="grid grid-cols-2 gap-1 p-3 sm:p-4">
+                {(['a', 'b'] as const).map((lado) => (
+                  <div
+                    key={lado}
+                    className={`flex items-center justify-center border-2 py-6 font-titulo text-lg font-bold uppercase transition-all sm:py-8 sm:text-xl ${
+                      reveladoConvocatoria.destacado === lado
+                        ? 'scale-105 border-acento bg-acento text-fondo'
+                        : 'border-hueso/15 bg-superficie-alta text-hueso/30'
+                    }`}
+                  >
+                    {lado === 'a' ? '¡Campeones!' : 'Perdimos'}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="px-3 py-2 sm:px-4 sm:py-3">
+                  <div className="font-mono-stats text-[9px] tracking-[0.1em] text-acento">
+                    {evento.decision.torneo === 'mundial' ? 'SELECCIÓN · MUNDIAL' : 'SELECCIÓN · JUEGOS OLÍMPICOS'}
+                  </div>
+                  <div className="font-titulo text-base font-bold uppercase leading-tight sm:text-lg">
+                    {evento.decision.escenaTitulo}
+                  </div>
+                  <div className="mt-0.5 font-titulo text-xs font-light text-hueso/60 sm:text-sm">
+                    {evento.decision.escenaDescripcion}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-0.5 bg-hueso/10">
+                  {OPCIONES_CONVOCATORIA.map((opcion) => (
+                    <button
+                      key={opcion.id}
+                      type="button"
+                      onClick={() => jugarConvocatoria(opcion.id)}
+                      className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 text-center hover:bg-superficie"
+                    >
+                      <span className="font-titulo text-sm font-semibold uppercase sm:text-base">{opcion.nombre}</span>
+                      <span className="font-mono-stats text-[9px] text-hueso/50">{opcion.descripcion}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ))}
+
           {(evento.tipo === 'club-liga-domestica' || evento.tipo === 'draft' || evento.tipo === 'trade') && (
             <>
               <div className="flex items-center gap-2 px-3 py-1.5 sm:px-4">
@@ -449,10 +576,17 @@ export function PantallaCarrera({ carrera, onElegir }: PantallaCarreraProps) {
               <span className="truncate font-titulo font-medium uppercase tracking-[0.02em]">{entrada.clubNombre ?? '—'}</span>
               {entrada.trofeosGanados.length > 0 && (
                 <span className="flex shrink-0 items-center gap-0.5">
-                  {entrada.trofeosGanados.map((t, ti) => {
-                    const Icono = ICONOS_TROFEO[t]
-                    return <Icono key={ti} className="h-3 w-3 text-acento" />
-                  })}
+                  {entrada.trofeosGanados.map((t, ti) =>
+                    // El título local usa la imagen real de la liga del jugador, no un ícono fijo
+                    t === 'liga-local' ? (
+                      <IconoLigaLocal key={ti} className="h-3 w-3" url={carrera.ligaDomestica?.trofeoUrl} />
+                    ) : (
+                      (() => {
+                        const Icono = ICONOS_TROFEO[t]
+                        return <Icono key={ti} className="h-3 w-3 text-acento" />
+                      })()
+                    ),
+                  )}
                 </span>
               )}
             </div>

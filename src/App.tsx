@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { crearCarrera, elegirOpcion, type Carrera } from './engine/motorCarrera'
+import { crearCarrera, elegirOpcion, continuarCarrera, type Carrera } from './engine/motorCarrera'
 import { EQUIPOS_NBA } from './engine/datos/equiposNba'
 import { PantallaSetupWizard } from './ui/PantallaSetupWizard'
 import type { DatosSetup } from './ui/tiposSetup'
@@ -33,6 +33,15 @@ function App() {
     if (siguiente.retirado) setPantalla('retiro')
   }
 
+  // Los títulos/torneos frenan la carrera hasta que el jugador los ve (ver `Desenlace` en
+  // motorCarrera.ts) — este es el paso que la retoma.
+  function continuar() {
+    if (!carrera) return
+    const siguiente = continuarCarrera(carrera, Math.random, EQUIPOS_NBA)
+    setCarrera(siguiente)
+    if (siguiente.retirado) setPantalla('retiro')
+  }
+
   function nuevaCarrera() {
     setCarrera(null)
     setPantalla('setup')
@@ -42,7 +51,9 @@ function App() {
     <main className="min-h-screen bg-fondo px-4 py-10 text-hueso">
       <div className="textura-grano" />
       {pantalla === 'setup' && <PantallaSetupWizard onEmpezar={empezarCarrera} />}
-      {pantalla === 'carrera' && carrera && <PantallaCarrera carrera={carrera} onElegir={elegir} />}
+      {pantalla === 'carrera' && carrera && (
+        <PantallaCarrera carrera={carrera} onElegir={elegir} onContinuar={continuar} />
+      )}
       {pantalla === 'retiro' && carrera && (
         <PantallaRetiro carrera={carrera} nombreCompleto={nombreCompleto} onNuevaCarrera={nuevaCarrera} />
       )}

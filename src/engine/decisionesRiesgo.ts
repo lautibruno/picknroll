@@ -43,3 +43,15 @@ export function generarDecisionRiesgo(azar: Azar): DecisionRiesgo {
   const tema = TEMAS_RIESGO[Math.floor(azar() * TEMAS_RIESGO.length)]
   return { ...tema, exito: azar() < tema.probabilidadExito }
 }
+
+// Impacto directo en el OVR de arriesgar y que salga bien o mal (pedido explícito del
+// usuario: "cuando hay una decisión y la gano debe dar un incremento... y si perdés que
+// reste"). Es asimétrico a propósito: ganar paga más de lo que cuesta perder, así competir
+// sigue siendo la jugada atractiva y no un castigo por animarse. Va ADEMÁS del efecto de
+// rol (titular/rotación), que sigue modulando estadísticas y crecimiento futuro.
+export const OVR_GANADO_AL_COMPETIR = 4
+export const OVR_PERDIDO_AL_FALLAR = 2
+
+export function cambioOvrPorRiesgo(exito: boolean): number {
+  return exito ? OVR_GANADO_AL_COMPETIR : -OVR_PERDIDO_AL_FALLAR
+}

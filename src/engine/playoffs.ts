@@ -137,7 +137,8 @@ function elegirEscenaJugadaFinal(azar: Azar): EscenaJugadaFinal {
 }
 
 export type ResultadoPlayoffs =
-  | { estado: 'campeon' }
+  // `rival` es a quién le ganaste la Final — sirve para el cartel de campeón.
+  | { estado: 'campeon'; rival: string }
   | { estado: 'eliminado'; ronda: number; rival: string; marcador: string }
   // Los dos resultados posibles ya vienen resueltos acá mismo (mismo criterio que
   // decisionesRiesgo.ts: "las cartas ya están sobre la mesa") — así la UI puede mostrar
@@ -160,8 +161,10 @@ export function simularPlayoffs(
   clubActualId: string | null,
 ): ResultadoPlayoffs {
   const rivalesEnfrentados: string[] = clubActualId ? [clubActualId] : []
+  let rivalDeLaFinal = ''
   for (let ronda = 1; ronda <= CANTIDAD_RONDAS_PLAYOFFS; ronda++) {
     const rival = elegirRival(ronda, azar, equiposLiga, rivalesEnfrentados)
+    rivalDeLaFinal = rival.nombre
     rivalesEnfrentados.push(rival.id)
     const esFinal = ronda === CANTIDAD_RONDAS_PLAYOFFS
     const resultado = simularSerieBestOf3(nivelEquipo, rival.nivel, azar, esFinal, ovrJugador)
@@ -180,7 +183,7 @@ export function simularPlayoffs(
       return { estado: 'eliminado', ronda, rival: rival.nombre, marcador: resultado.marcador }
     }
   }
-  return { estado: 'campeon' }
+  return { estado: 'campeon', rival: rivalDeLaFinal }
 }
 
 export interface OpcionJugadaFinal {

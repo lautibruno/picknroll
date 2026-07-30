@@ -3,10 +3,12 @@ import {
   crearCarrera,
   elegirOpcion,
   avanzarSiCorresponde,
+  continuarCarrera,
   type Carrera,
   type Equipo,
 } from './motorCarrera'
 import { UMBRAL_DRAFT_OVR } from './caminosPreNba'
+import { OVR_GANADO_AL_COMPETIR, OVR_PERDIDO_AL_FALLAR } from './decisionesRiesgo'
 
 const EQUIPOS_NBA: Equipo[] = [
   { id: 'a', nombre: 'A', nivel: 40 },
@@ -36,15 +38,34 @@ function azarUnaVezLuego(primero: number, resto: number): () => number {
 // elegirOpcion ya encadena directo a la próxima decisión (ver motorCarrera.ts), así que
 // una sola llamada acá resuelve Y avanza, no hace falta combinarla con avanzarSiCorresponde.
 function resolverPendiente(carrera: Carrera): Carrera {
+  // Los títulos frenan la carrera hasta que el jugador los ve (ver `Desenlace`): en los tests
+  // se destraban al toque para poder seguir avanzando.
+  if (carrera.desenlacePendiente) return continuarCarrera(carrera, azarFijo(0.5), EQUIPOS_NBA)
   if (!carrera.eventoPendiente) return carrera
   if (carrera.eventoPendiente.tipo === 'riesgo') return elegirOpcion(carrera, 'seguro', azarFijo(0.5), EQUIPOS_NBA)
   if (carrera.eventoPendiente.tipo === 'jugada-final') return elegirOpcion(carrera, 'finta', azarFijo(0.01), EQUIPOS_NBA)
+  if (carrera.eventoPendiente.tipo === 'convocatoria') {
+    return elegirOpcion(carrera, 'jugar-para-el-equipo', azarFijo(0.01), EQUIPOS_NBA)
+  }
   return elegirOpcion(carrera, carrera.eventoPendiente.opciones[0].id, azarFijo(0.5), EQUIPOS_NBA)
+}
+
+// Destraba todos los desenlaces (títulos) encadenados hasta llegar a una decisión real.
+function sinDesenlace(carrera: Carrera, azar: () => number = azarFijo(0.5)): Carrera {
+  let actual = carrera
+  let vueltas = 0
+  while (actual.desenlacePendiente && vueltas < 50) {
+    actual = continuarCarrera(actual, azar, EQUIPOS_NBA)
+    vueltas++
+  }
+  return actual
 }
 
 function opcionesDe(carrera: Carrera): { id: string }[] {
   const evento = carrera.eventoPendiente!
-  if (evento.tipo === 'riesgo' || evento.tipo === 'jugada-final') throw new Error('este evento no tiene .opciones')
+  if (evento.tipo === 'riesgo' || evento.tipo === 'jugada-final' || evento.tipo === 'convocatoria') {
+    throw new Error('este evento no tiene .opciones')
+  }
   return evento.opciones
 }
 
@@ -183,7 +204,10 @@ describe('motorCarrera', () => {
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = conEventoDraft(carrera)
     carrera = elegirOpcion(carrera, 'top', azarEntrada, EQUIPOS_NBA)
-    return carrera
+    // Con azar bajo la primera temporada NBA puede salir campeona, y un título ahora frena la
+    // carrera hasta que el jugador lo vea (ver `Desenlace`) — se destraba para que el test
+    // llegue al evento que quiere probar.
+    return sinDesenlace(carrera, azarEntrada)
   }
 
   it('una vez en la NBA, con azar alto toca evento de trade (no de riesgo)', () => {
@@ -191,8 +215,16 @@ describe('motorCarrera', () => {
     expect(carrera.eventoPendiente?.tipo).toBe('trade')
   })
 
+  // `intervaloTemporadas: 0` saltea la simulación de temporadas y deja ver SOLO la elección de
+  // rama (riesgo vs trade). Hace falta porque con azar bajo toda temporada NBA sale campeona, y
+  // un título ahora frena la carrera antes de llegar a la próxima decisión (ver `Desenlace`).
   it('una vez en la NBA, con azar bajo toca decisión de riesgo (no trade)', () => {
-    const carrera = llegarANba('intensa', azarFijo(0.1))
+    const base = llegarANba('intensa', azarFijo(0.99))
+    const carrera = avanzarSiCorresponde(
+      { ...base, intervaloTemporadas: 0, eventoPendiente: null },
+      EQUIPOS_NBA,
+      azarFijo(0.1),
+    )
     expect(carrera.eventoPendiente?.tipo).toBe('riesgo')
   })
 
@@ -203,10 +235,19 @@ describe('motorCarrera', () => {
   })
 
   it('en una decisión de riesgo, elegir "seguro" (aceptar rotación) fuerza el rol "rotacion", no cambia el OVR directo', () => {
-    let carrera = llegarANba('intensa', azarFijo(0.1))
-    expect(carrera.eventoPendiente?.tipo).toBe('riesgo')
-    carrera = elegirOpcion(carrera, 'seguro', azarFijo(0.5), EQUIPOS_NBA)
+    const base = llegarANba('intensa', azarFijo(0.99))
+    const ovrPrevio = base.jugador.ovr
+    let carrera: Carrera = {
+      ...base,
+      eventoPendiente: {
+        tipo: 'riesgo',
+        decision: { titulo: 'Competencia por el puesto', descripcion: 'test', probabilidadExito: 0.5, exito: true },
+      },
+    }
+    carrera = elegirOpcion(carrera, 'seguro', azarFijo(0.99), EQUIPOS_NBA)
     expect(carrera.ultimoResultadoRiesgo?.rol).toBe('rotacion')
+    // jugar seguro no mueve el OVR (solo arriesgar lo hace, ver decisionesRiesgo.ts)
+    expect(carrera.jugador.ovr).toBe(ovrPrevio)
   })
 
   it('en una decisión de riesgo, elegir "arriesgar" (competir) fuerza el rol según el resultado ya resuelto (titular o rotación)', () => {
@@ -351,17 +392,37 @@ describe('motorCarrera', () => {
     }
     const anillosPrevios = carrera.trofeos.anillos
     const indiceTemporadaCampeon = carrera.historial.length - 1
-    // azarUnaVezLuego evita que la temporada siguiente (que arranca en el mismo llamado)
-    // clasifique a playoffs por casualidad y confunda el conteo de anillos — el resultado
-    // de la jugada final en sí ya viene resuelto en el propio evento, no depende del azar acá.
     carrera = elegirOpcion(carrera, 'finta', azarUnaVezLuego(0.01, 0.99), EQUIPOS_NBA)
     expect(carrera.trofeos.anillos).toBe(anillosPrevios + 1)
     // el ícono de anillo se marca retroactivamente en la fila de la temporada del título
     // (pedido del usuario: "figurar como iconos... en la temporada que se ganó")
     expect(carrera.historial[indiceTemporadaCampeon].trofeosGanados).toContain('anillo')
-    // la carrera sigue: elegirOpcion ya encadenó a la próxima temporada/decisión
-    expect(carrera.eventoPendiente).not.toBeNull()
     expect(carrera.estadoPlayoffsPendiente).toBeNull()
+    // El título FRENA la carrera hasta que el jugador lo ve: no encadena a la temporada
+    // siguiente en el mismo llamado (bug reportado por el usuario, ver `Desenlace`).
+    expect(carrera.desenlacePendiente?.gano).toBe(true)
+    expect(carrera.eventoPendiente).toBeNull()
+    // y recién al continuar aparece la próxima decisión
+    expect(continuarCarrera(carrera, azarFijo(0.99), EQUIPOS_NBA).eventoPendiente).not.toBeNull()
+  })
+
+  it('errar la jugada final NO da el título, y el desenlace lo dice antes de seguir (bug reportado)', () => {
+    let carrera = llegarANba()
+    carrera = {
+      ...carrera,
+      // resultadoSiTriple: false -> elegir 'triple' pierde la Final
+      eventoPendiente: { tipo: 'jugada-final', rival: 'Ironclads', escenaTitulo: 'Últimos segundos', escenaDescripcion: 'Test.', resultadoSiFinta: true, resultadoSiTriple: false },
+      estadoPlayoffsPendiente: { nivelEquipo: 90, ronda: 3, rival: 'Ironclads' },
+      resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
+    }
+    const anillosPrevios = carrera.trofeos.anillos
+    // azar bajo a propósito: antes, la temporada SIGUIENTE se simulaba en el mismo llamado y
+    // podía salir campeona, así que errar el tiro igual mostraba el título.
+    carrera = elegirOpcion(carrera, 'triple', azarFijo(0.01), EQUIPOS_NBA)
+    expect(carrera.trofeos.anillos).toBe(anillosPrevios)
+    expect(carrera.desenlacePendiente?.gano).toBe(false)
+    expect(carrera.desenlacePendiente?.iconos).toEqual([])
+    expect(carrera.eventoPendiente).toBeNull()
   })
 
   it('elegir "triple" en una jugada final perdida no suma anillo', () => {
@@ -394,11 +455,103 @@ describe('motorCarrera', () => {
     expect(carrera.ultimoCambioOvr).toBeGreaterThan(0)
   })
 
-  it('ultimoCambioOvr da 0 si la decisión de riesgo no mueve el OVR directo', () => {
-    let carrera = llegarANba('intensa', azarFijo(0.1))
-    expect(carrera.eventoPendiente?.tipo).toBe('riesgo')
-    carrera = elegirOpcion(carrera, 'seguro', azarFijo(0.5), EQUIPOS_NBA)
-    expect(carrera.ultimoCambioOvr).toBe(0)
+  it('arriesgar y ganar la decisión suma OVR; perderla resta (pedido explícito del usuario)', () => {
+    const base = llegarANba('intensa', azarFijo(0.99))
+    // potencial bien alto para que el clamp no se coma el aumento, e `intervaloTemporadas: 0`
+    // para medir SOLO el efecto de la decisión (sin el crecimiento natural de las temporadas
+    // que se simulan después, que también mueve el OVR).
+    const preparada: Carrera = {
+      ...base,
+      jugador: { ...base.jugador, ovr: 70, potencial: 99 },
+      ovrAlIniciarDecision: 70,
+      intervaloTemporadas: 0,
+    }
+    const decisionBase = { titulo: 'Competencia por el puesto', descripcion: 'test', probabilidadExito: 0.5 }
+
+    const ganada = elegirOpcion(
+      { ...preparada, eventoPendiente: { tipo: 'riesgo', decision: { ...decisionBase, exito: true } } },
+      'arriesgar',
+      azarFijo(0.99),
+      EQUIPOS_NBA,
+    )
+    const perdida = elegirOpcion(
+      { ...preparada, eventoPendiente: { tipo: 'riesgo', decision: { ...decisionBase, exito: false } } },
+      'arriesgar',
+      azarFijo(0.99),
+      EQUIPOS_NBA,
+    )
+
+    expect(ganada.ultimoCambioOvr).toBe(OVR_GANADO_AL_COMPETIR)
+    expect(perdida.ultimoCambioOvr).toBe(-OVR_PERDIDO_AL_FALLAR)
+    expect(ganada.jugador.ovr).toBeGreaterThan(perdida.jugador.ovr)
+  })
+
+  it('en pre-nba con liga curada se puede salir campeón local, y frena la carrera para mostrarlo', () => {
+    // Argentina tiene liga curada; azar bajo hace que el chequeo de título local pase.
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.01), EQUIPOS_NBA)
+    expect(carrera.trofeos.ligaLocal).toBe(1)
+    expect(carrera.desenlacePendiente?.iconos).toEqual(['liga-local'])
+    expect(carrera.historial.at(-1)?.trofeosGanados).toContain('liga-local')
+    // el nombre de la liga real aparece en el texto del desenlace
+    expect(carrera.desenlacePendiente?.texto).toContain('Liga Nacional de Básquet')
+  })
+
+  it('sin liga doméstica curada (camino genérico) nunca hay título local', () => {
+    // 'us' usa el camino genérico universidad/G-League, no una liga doméstica
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    expect(carrera.ligaDomestica).toBeNull()
+    carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.01), EQUIPOS_NBA)
+    expect(carrera.trofeos.ligaLocal).toBe(0)
+  })
+
+  it('ganar la decisión de convocatoria otorga el Mundial y lo marca en el historial', () => {
+    const base = llegarANba('intensa', azarFijo(0.99))
+    const carrera = elegirOpcion(
+      {
+        ...base,
+        eventoPendiente: {
+          tipo: 'convocatoria',
+          decision: {
+            torneo: 'mundial',
+            escenaTitulo: 'Final del Mundial',
+            escenaDescripcion: 'test',
+            resultadoSiEquipo: true,
+            resultadoSiResponsabilidad: false,
+          },
+        },
+      },
+      'jugar-para-el-equipo',
+      azarFijo(0.99),
+      EQUIPOS_NBA,
+    )
+    expect(carrera.trofeos.mundial).toBe(base.trofeos.mundial + 1)
+    expect(carrera.desenlacePendiente?.gano).toBe(true)
+    expect(carrera.historial.at(-1)?.trofeosGanados).toContain('mundial')
+  })
+
+  it('perder la decisión de convocatoria no otorga nada', () => {
+    const base = llegarANba('intensa', azarFijo(0.99))
+    const carrera = elegirOpcion(
+      {
+        ...base,
+        eventoPendiente: {
+          tipo: 'convocatoria',
+          decision: {
+            torneo: 'jjoo',
+            escenaTitulo: 'Final olímpica',
+            escenaDescripcion: 'test',
+            resultadoSiEquipo: true,
+            resultadoSiResponsabilidad: false,
+          },
+        },
+      },
+      'tomar-la-responsabilidad',
+      azarFijo(0.01),
+      EQUIPOS_NBA,
+    )
+    expect(carrera.trofeos.jjoo).toBe(base.trofeos.jjoo)
+    expect(carrera.desenlacePendiente?.gano).toBe(false)
   })
 
   it('una temporada NBA con OVR de nivel All-Star marca el ícono en esa fila del historial', () => {

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
-const DURACION_MS = 700
+// Subida/bajada deliberadamente lenta — pedido explícito del usuario: "debe incrementar con
+// animación de subida de números de forma lenta y luego de subir, que aparezcan las opciones".
+// Tiene que quedar por debajo de DEMORA_OPCIONES_MS (PantallaCarrera.tsx) para que el número
+// termine de moverse ANTES de que aparezcan las opciones nuevas.
+const DURACION_MS = 950
 
 function easeOutCubic(t: number): number {
   return 1 - (1 - t) ** 3

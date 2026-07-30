@@ -181,6 +181,14 @@ body {
 .animar-delta {
   animation: delta-pop 1.6s ease-out forwards;
 }
+/* Latido del indicador de "jugando la temporada" mientras el OVR termina de animar. */
+@keyframes latido {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.animar-latido {
+  animation: latido 900ms ease-in-out infinite;
+}
 @keyframes delta-pop-baja {
   0% { opacity: 0; transform: translate(-50%, 30%) scale(0.5); }
   25% { opacity: 1; transform: translate(-50%, 50%) scale(1.18); }

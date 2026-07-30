@@ -47,12 +47,21 @@ export function IconoJjoo({ className }: IconoProps) {
   return <img src={URL_JJOO} alt="Medalla de oro olímpica" className={`object-contain ${className ?? ''}`} />
 }
 
+// El título de liga local no tiene un ícono fijo: usa la imagen REAL de la liga que estás
+// jugando (ver `ligaDomestica` en motorCarrera.ts y `trofeoUrl` en datos/ligasPorPais.ts),
+// así que la UI le pasa la URL en vez de dibujar un ícono propio.
+export function IconoLigaLocal({ className, url }: IconoProps & { url?: string }) {
+  if (!url) return <span className={className} />
+  return <img src={url} alt="Título de liga local" className={`object-contain ${className ?? ''}`} />
+}
+
 export const ICONOS_TROFEO: Record<IconoTrofeo, (props: IconoProps) => ReactElement> = {
   anillo: IconoAnillo,
   allstar: IconoAllStar,
   mvp: IconoMvp,
   mundial: IconoMundial,
   jjoo: IconoJjoo,
+  'liga-local': IconoLigaLocal,
 }
 
 export const ETIQUETA_TROFEO: Record<IconoTrofeo, string> = {
@@ -61,6 +70,7 @@ export const ETIQUETA_TROFEO: Record<IconoTrofeo, string> = {
   mvp: 'MVP',
   mundial: 'Mundial',
   jjoo: 'JJOO',
+  'liga-local': 'Liga local',
 }
 
 // Descripción para la vitrina de fin de carrera (pedido explícito del usuario: "cuando pasas
@@ -69,6 +79,7 @@ export const DESCRIPCION_TROFEO: Record<IconoTrofeo, string> = {
   anillo: 'Campeón de la NBA — Trofeo Larry O’Brien, ganado en los playoffs.',
   allstar: 'Convocado al All-Star Game de la NBA por tu nivel esa temporada.',
   mvp: 'Jugador Más Valioso de la temporada regular de la NBA.',
-  mundial: 'Convocado a la selección para el Mundial de básquet (FIBA).',
-  jjoo: 'Convocado a la selección para los Juegos Olímpicos.',
+  mundial: 'Campeón del Mundial de básquet (FIBA) con tu selección.',
+  jjoo: 'Medalla de oro olímpica con tu selección.',
+  'liga-local': 'Campeón de la liga de tu país, antes de llegar a la NBA.',
 }

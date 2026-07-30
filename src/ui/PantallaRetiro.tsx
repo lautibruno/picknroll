@@ -1,16 +1,9 @@
 import { useState } from 'react'
-import type { Carrera, IconoTrofeo } from '../engine/motorCarrera'
+import type { Carrera } from '../engine/motorCarrera'
 import { calcularVeredicto } from '../engine/veredicto'
-import { ICONOS_TROFEO, ETIQUETA_TROFEO, DESCRIPCION_TROFEO } from './iconosTrofeos'
-
-const CLAVE_TROFEO: Record<IconoTrofeo, keyof Carrera['trofeos']> = {
-  anillo: 'anillos',
-  allstar: 'allStar',
-  mvp: 'mvp',
-  mundial: 'mundial',
-  jjoo: 'jjoo',
-}
-const ORDEN_VITRINA: IconoTrofeo[] = ['anillo', 'mvp', 'allstar', 'mundial', 'jjoo']
+import { resumirRecorrido } from '../engine/recorrido'
+import { ICONOS_TROFEO, IconoLigaLocal } from './iconosTrofeos'
+import { VitrinaTrofeos } from './VitrinaTrofeos'
 
 interface PantallaRetiroProps {
   carrera: Carrera
@@ -34,11 +27,11 @@ function armarTextoCompartir(carrera: Carrera, nombreCompleto: string): string {
 
 export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: PantallaRetiroProps) {
   const [copiado, setCopiado] = useState(false)
-  const [trofeoAbierto, setTrofeoAbierto] = useState<IconoTrofeo | null>(null)
   const texto = armarTextoCompartir(carrera, nombreCompleto)
   const picoOvr = Math.max(0, ...carrera.historial.map((h) => h.ovr), carrera.jugador.ovr)
   const totalPj = carrera.historial.reduce((acc, h) => acc + h.pj, 0)
   const veredicto = calcularVeredicto(carrera)
+  const recorrido = resumirRecorrido(carrera.historial)
 
   async function copiar() {
     try {
@@ -88,52 +81,66 @@ export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: Pant
       </div>
 
       <div className="border-b-2 border-hueso/15 px-6 py-6">
+        <VitrinaTrofeos carrera={carrera} />
+      </div>
+
+      {/* Recorrido: todos los equipos por los que pasó (pedido explícito del usuario). */}
+      <div className="border-b-2 border-hueso/15 px-6 py-6">
         <div className="mb-3 flex items-baseline justify-between">
-          <div className="font-mono-stats text-[10px] tracking-[0.2em] text-hueso/45">VITRINA</div>
+          <div className="font-mono-stats text-[10px] tracking-[0.2em] text-hueso/45">RECORRIDO</div>
           <div className="font-mono-stats text-[10px] tracking-[0.12em] text-hueso/40">
-            {ORDEN_VITRINA.reduce((total, t) => total + carrera.trofeos[CLAVE_TROFEO[t]], 0)} TÍTULOS
+            {recorrido.length} {recorrido.length === 1 ? 'EQUIPO' : 'EQUIPOS'}
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          {ORDEN_VITRINA.map((t, i) => {
-            const cantidad = carrera.trofeos[CLAVE_TROFEO[t]]
-            const Icono = ICONOS_TROFEO[t]
-            const abierto = trofeoAbierto === t
-            return (
-              <button
-                key={t}
-                type="button"
-                title={DESCRIPCION_TROFEO[t]}
-                onClick={() => setTrofeoAbierto(abierto ? null : t)}
-                className="animar-trofeo group flex aspect-square w-28 flex-col items-center justify-center gap-1.5 text-center"
-                style={{
-                  animationDelay: `${i * 100}ms`,
-                  border: cantidad > 0 ? '2px solid var(--color-acento)' : '1px dashed rgba(245,241,232,0.22)',
-                  background: cantidad > 0 ? 'var(--color-superficie-alta)' : 'var(--color-fondo)',
-                }}
-              >
-                <Icono className="h-8 w-8" />
-                <div
-                  className="font-marcador text-2xl leading-none"
-                  style={{ color: cantidad > 0 ? 'var(--color-acento)' : 'rgba(245,241,232,0.25)' }}
-                >
-                  {cantidad}
+        <div className="flex flex-col">
+          {recorrido.map((paso, i) => (
+            <div key={`${paso.clubId ?? 'sin'}-${paso.edadDesde}-${i}`} className="flex items-stretch gap-3">
+              <div className="w-16 shrink-0 pt-3 font-mono-stats text-[10px] text-hueso/50">
+                {paso.edadDesde === paso.edadHasta ? paso.edadDesde : `${paso.edadDesde}–${paso.edadHasta}`}
+              </div>
+              {/* Línea de tiempo punteada */}
+              <div className="flex w-3 shrink-0 flex-col items-center">
+                <div className={`mt-3.5 h-2.5 w-2.5 shrink-0 ${paso.trofeos.length > 0 ? 'bg-acento' : 'bg-hueso/40'}`} />
+                {i < recorrido.length - 1 && (
+                  <div
+                    className="w-0.5 flex-1"
+                    style={{
+                      background:
+                        'repeating-linear-gradient(180deg,rgba(245,241,232,0.3) 0 5px,transparent 5px 10px)',
+                    }}
+                  />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 pb-4 pt-2.5">
+                <div className="flex items-center gap-1.5">
+                  {paso.clubEscudoUrl && (
+                    <img src={paso.clubEscudoUrl} alt="" className="h-4 w-4 shrink-0 object-contain" />
+                  )}
+                  <span className="truncate font-titulo text-sm font-semibold uppercase tracking-[0.03em]">
+                    {paso.clubNombre}
+                  </span>
+                  {paso.trofeos.length > 0 && (
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      {paso.trofeos.map((t, ti) =>
+                        t === 'liga-local' ? (
+                          <IconoLigaLocal key={ti} className="h-3.5 w-3.5" url={carrera.ligaDomestica?.trofeoUrl} />
+                        ) : (
+                          (() => {
+                            const Icono = ICONOS_TROFEO[t]
+                            return <Icono key={ti} className="h-3.5 w-3.5 text-acento" />
+                          })()
+                        ),
+                      )}
+                    </span>
+                  )}
                 </div>
-                <div
-                  className="font-mono-stats text-[9px] tracking-[0.12em]"
-                  style={{ color: cantidad > 0 ? 'var(--color-hueso)' : 'rgba(245,241,232,0.35)' }}
-                >
-                  {ETIQUETA_TROFEO[t]}
+                <div className="mt-0.5 font-mono-stats text-[10px] text-hueso/45">
+                  {paso.temporadas} {paso.temporadas === 1 ? 'temporada' : 'temporadas'}
                 </div>
-              </button>
-            )
-          })}
+              </div>
+            </div>
+          ))}
         </div>
-        {trofeoAbierto && (
-          <div className="mt-3 border-l-4 border-acento bg-superficie-alta/60 px-4 py-2.5 font-titulo text-xs text-hueso/80">
-            {DESCRIPCION_TROFEO[trofeoAbierto]}
-          </div>
-        )}
       </div>
 
       <div className="px-6 py-6">

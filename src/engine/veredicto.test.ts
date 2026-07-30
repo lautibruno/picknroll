@@ -14,8 +14,11 @@ function carreraBase(overrides: Partial<Carrera>): Carrera {
     especializacion: null,
     rolForzado: null,
     eventoPendiente: null,
+    desenlacePendiente: null,
     historial: [],
-    trofeos: { anillos: 0, allStar: 0, mvp: 0, mundial: 0, jjoo: 0 },
+    trofeos: { anillos: 0, allStar: 0, mvp: 0, mundial: 0, jjoo: 0, ligaLocal: 0 },
+    ligaDomestica: null,
+    temporadasEnClubActual: 0,
     ultimoResultadoRiesgo: null,
     resumenTemporada: null,
     estadoPlayoffsPendiente: null,
@@ -33,7 +36,7 @@ describe('calcularVeredicto', () => {
   })
 
   it('con MVP, es Leyenda sin importar otra cosa', () => {
-    const veredicto = calcularVeredicto(carreraBase({ trofeos: { anillos: 0, allStar: 0, mvp: 1, mundial: 0, jjoo: 0 } }))
+    const veredicto = calcularVeredicto(carreraBase({ trofeos: { anillos: 0, allStar: 0, mvp: 1, mundial: 0, jjoo: 0, ligaLocal: 0 } }))
     expect(veredicto.titulo).toBe('LEYENDA')
   })
 
@@ -45,12 +48,12 @@ describe('calcularVeredicto', () => {
   })
 
   it('con 3+ All-Star, es Estrella NBA', () => {
-    const veredicto = calcularVeredicto(carreraBase({ trofeos: { anillos: 0, allStar: 3, mvp: 0, mundial: 0, jjoo: 0 } }))
+    const veredicto = calcularVeredicto(carreraBase({ trofeos: { anillos: 0, allStar: 3, mvp: 0, mundial: 0, jjoo: 0, ligaLocal: 0 } }))
     expect(veredicto.titulo).toBe('ESTRELLA NBA')
   })
 
   it('con al menos un All-Star, es Buen Titular', () => {
-    const veredicto = calcularVeredicto(carreraBase({ trofeos: { anillos: 0, allStar: 1, mvp: 0, mundial: 0, jjoo: 0 } }))
+    const veredicto = calcularVeredicto(carreraBase({ trofeos: { anillos: 0, allStar: 1, mvp: 0, mundial: 0, jjoo: 0, ligaLocal: 0 } }))
     expect(veredicto.titulo).toBe('BUEN TITULAR')
   })
 
