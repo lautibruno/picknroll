@@ -14,7 +14,7 @@ function carreraBase(overrides: Partial<Carrera>): Carrera {
     especializacion: null,
     rolForzado: null,
     eventoPendiente: null,
-    desenlacePendiente: null,
+    desenlacesPendientes: [],
     historial: [],
     trofeos: { anillos: 0, allStar: 0, mvp: 0, mundial: 0, jjoo: 0, ligaLocal: 0 },
     ligaDomestica: null,

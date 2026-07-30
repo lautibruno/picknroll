@@ -47,14 +47,6 @@ function abreviarNombre(nombre: string): string {
   return primeraPalabra.slice(0, 3).toUpperCase()
 }
 
-function etiquetaDesafioClub(nivelClub: number, ovr: number): string {
-  const diferencia = nivelClub - ovr
-  if (diferencia >= 10) return 'CRECÉS MUCHO'
-  if (diferencia >= 0) return 'CRECÉS BIEN'
-  if (diferencia >= -10) return 'CRECÉS POCO'
-  return 'CASI NO CRECÉS'
-}
-
 function OvrAnimado({ objetivo, inicial }: { objetivo: number; inicial: number }) {
   const mostrado = useNumeroAnimado(objetivo, inicial)
   const color = colorPorOvr(mostrado)
@@ -115,7 +107,10 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
   const resultadoRiesgo = carrera.ultimoResultadoRiesgo
   const resumen = carrera.resumenTemporada
   const evento = carrera.eventoPendiente
-  const desenlace = carrera.desenlacePendiente
+  // Se muestra de a uno: si en el mismo bloque salieron varios títulos, se ven en fila (ver
+  // `Desenlace` en motorCarrera.ts).
+  const desenlace = carrera.desenlacesPendientes[0] ?? null
+  const desenlacesRestantes = carrera.desenlacesPendientes.length - 1
 
   const revelado = useRevelado(() => {
     if (evento?.tipo === 'riesgo') onElegir('arriesgar')
@@ -162,15 +157,22 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
       }
     }
     previoRef.current = carrera.historial.length
-
-    if (nuevos.length > 0) {
-      setCartelTrofeos(nuevos)
-      const t = setTimeout(() => setCartelTrofeos(null), DURACION_CARTEL_TROFEOS_MS)
-      return () => clearTimeout(t)
-    }
+    if (nuevos.length > 0) setCartelTrofeos(nuevos)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe reaccionar a que cambie
     // la CANTIDAD de temporadas, no cada vez que el array se recrea
   }, [carrera.historial.length])
+
+  // El temporizador que cierra el cartel va en su PROPIO efecto, atado a `cartelTrofeos`.
+  // Bug real reportado por el usuario ("me quedo trabado en all star"): antes se armaba dentro
+  // del efecto de arriba, cuya dependencia (`historial.length`) puede volver a cambiar antes de
+  // que el cartel se cierre — por ejemplo si en la misma temporada ganás All-Star y además un
+  // título, y tocás CONTINUAR. Ese cambio disparaba el cleanup (matando el setTimeout) sin
+  // armar uno nuevo, así que el cartel quedaba para siempre tapando la pantalla.
+  useEffect(() => {
+    if (!cartelTrofeos) return
+    const t = setTimeout(() => setCartelTrofeos(null), DURACION_CARTEL_TROFEOS_MS)
+    return () => clearTimeout(t)
+  }, [cartelTrofeos])
 
   function elegirClub(opcionId: string) {
     if (clubBloqueado) return
@@ -204,8 +206,10 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
 
   return (
     <div className="mx-auto max-w-2xl border-2 border-hueso/15 bg-fondo">
+      {/* `pointer-events-none`: el cartel es puramente decorativo, nunca debe poder atrapar los
+          clics del jugador (segunda red de contención del bug "me quedo trabado en all star"). */}
       {cartelTrofeos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-fondo/80 p-6">
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-fondo/80 p-6">
           <div className="animar-trofeo sombra-brutal flex flex-col items-center gap-3 border-2 border-hueso bg-superficie-alta px-8 py-6">
             <div className="flex gap-3">
               {cartelTrofeos.map((t, i) => {
@@ -257,6 +261,11 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
             >
               Continuar
             </button>
+            {desenlacesRestantes > 0 && (
+              <div className="mt-2 font-mono-stats text-[9px] tracking-[0.14em] text-hueso/40">
+                +{desenlacesRestantes} MÁS
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -513,6 +522,12 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
                   {TITULOS_EVENTO[evento.tipo]}
                 </span>
               </div>
+              {/* Tarjetas más grandes (pedido del usuario: "se ven muy chico los equipos"), y
+                  SIN el nivel del club ni el pronóstico de crecimiento — pedido explícito: "que
+                  saques el nivel del equipo... que sea algo más genuino por decisión del que está
+                  jugando, que no se guíe por potencial". El motor sigue usando `nivel` por dentro
+                  para todo el balance; solo deja de mostrarse. Se conserva el rol (titular/
+                  rotación/banca) porque es algo que un jugador sí sabe al firmar. */}
               <div className="grid grid-cols-3 gap-0.5 bg-hueso/10">
                 {evento.opciones.map((opcion: Equipo) => {
                   const esQuedarse = opcion.id === carrera.clubActual?.id
@@ -523,28 +538,22 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
                       type="button"
                       onClick={() => elegirClub(opcion.id)}
                       disabled={clubBloqueado}
-                      className={`flex flex-col items-center gap-1 border-t-4 bg-fondo px-1.5 py-2 text-center transition-opacity active:scale-[0.97] disabled:opacity-40 ${
+                      className={`flex flex-col items-center justify-between gap-2 border-t-4 bg-fondo px-2 py-3.5 text-center transition-opacity active:scale-[0.97] disabled:opacity-40 hover:bg-superficie sm:gap-2.5 sm:px-3 sm:py-4 ${
                         esQuedarse ? 'border-hueso/40' : 'border-acento'
                       }`}
                     >
-                      <div className="flex h-8 w-8 items-center justify-center border border-hueso/25 bg-superficie-alta font-titulo text-[9px] font-semibold sm:h-10 sm:w-10">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-hueso/25 bg-superficie-alta font-titulo text-xs font-semibold sm:h-16 sm:w-16 sm:text-sm">
                         {opcion.escudoUrl ? (
-                          <img src={opcion.escudoUrl} alt="" className="h-6 w-6 object-contain sm:h-8 sm:w-8" />
+                          <img src={opcion.escudoUrl} alt="" className="h-9 w-9 object-contain sm:h-12 sm:w-12" />
                         ) : (
                           abreviarNombre(opcion.nombre)
                         )}
                       </div>
-                      <div className="line-clamp-2 font-titulo text-[10px] font-semibold uppercase leading-tight sm:text-xs">
+                      <div className="line-clamp-3 font-titulo text-[11px] font-semibold uppercase leading-tight sm:text-sm">
                         {opcion.nombre}
                       </div>
-                      <div className="flex w-full items-center gap-1">
-                        <div className="h-1 flex-1 bg-superficie">
-                          <div className="h-full bg-acento" style={{ width: `${opcion.nivel}%` }} />
-                        </div>
-                        <span className="font-mono-stats text-[8px] text-hueso/50">{opcion.nivel}</span>
-                      </div>
-                      <div className="font-mono-stats text-[7px] uppercase tracking-[0.04em] text-hueso/40 sm:text-[8px]">
-                        {esQuedarse ? 'quedarte' : `${stats.rol} · ${etiquetaDesafioClub(opcion.nivel, carrera.jugador.ovr)}`}
+                      <div className="font-mono-stats text-[8px] uppercase tracking-[0.06em] text-hueso/40 sm:text-[10px]">
+                        {esQuedarse ? 'quedarte' : stats.rol}
                       </div>
                     </button>
                   )

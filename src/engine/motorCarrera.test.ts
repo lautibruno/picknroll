@@ -40,7 +40,7 @@ function azarUnaVezLuego(primero: number, resto: number): () => number {
 function resolverPendiente(carrera: Carrera): Carrera {
   // Los títulos frenan la carrera hasta que el jugador los ve (ver `Desenlace`): en los tests
   // se destraban al toque para poder seguir avanzando.
-  if (carrera.desenlacePendiente) return continuarCarrera(carrera, azarFijo(0.5), EQUIPOS_NBA)
+  if (carrera.desenlacesPendientes.length > 0) return continuarCarrera(carrera)
   if (!carrera.eventoPendiente) return carrera
   if (carrera.eventoPendiente.tipo === 'riesgo') return elegirOpcion(carrera, 'seguro', azarFijo(0.5), EQUIPOS_NBA)
   if (carrera.eventoPendiente.tipo === 'jugada-final') return elegirOpcion(carrera, 'finta', azarFijo(0.01), EQUIPOS_NBA)
@@ -50,12 +50,12 @@ function resolverPendiente(carrera: Carrera): Carrera {
   return elegirOpcion(carrera, carrera.eventoPendiente.opciones[0].id, azarFijo(0.5), EQUIPOS_NBA)
 }
 
-// Destraba todos los desenlaces (títulos) encadenados hasta llegar a una decisión real.
-function sinDesenlace(carrera: Carrera, azar: () => number = azarFijo(0.5)): Carrera {
+// Descarta los carteles de título encolados para dejar a la vista la decisión de abajo.
+function sinDesenlace(carrera: Carrera): Carrera {
   let actual = carrera
   let vueltas = 0
-  while (actual.desenlacePendiente && vueltas < 50) {
-    actual = continuarCarrera(actual, azar, EQUIPOS_NBA)
+  while (actual.desenlacesPendientes.length > 0 && vueltas < 50) {
+    actual = continuarCarrera(actual)
     vueltas++
   }
   return actual
@@ -207,7 +207,7 @@ describe('motorCarrera', () => {
     // Con azar bajo la primera temporada NBA puede salir campeona, y un título ahora frena la
     // carrera hasta que el jugador lo vea (ver `Desenlace`) — se destraba para que el test
     // llegue al evento que quiere probar.
-    return sinDesenlace(carrera, azarEntrada)
+    return sinDesenlace(carrera)
   }
 
   it('una vez en la NBA, con azar alto toca evento de trade (no de riesgo)', () => {
@@ -398,15 +398,17 @@ describe('motorCarrera', () => {
     // (pedido del usuario: "figurar como iconos... en la temporada que se ganó")
     expect(carrera.historial[indiceTemporadaCampeon].trofeosGanados).toContain('anillo')
     expect(carrera.estadoPlayoffsPendiente).toBeNull()
-    // El título FRENA la carrera hasta que el jugador lo ve: no encadena a la temporada
-    // siguiente en el mismo llamado (bug reportado por el usuario, ver `Desenlace`).
-    expect(carrera.desenlacePendiente?.gano).toBe(true)
-    expect(carrera.eventoPendiente).toBeNull()
-    // y recién al continuar aparece la próxima decisión
-    expect(continuarCarrera(carrera, azarFijo(0.99), EQUIPOS_NBA).eventoPendiente).not.toBeNull()
+    // El anillo deja su propio cartel encolado, para que el jugador lo vea antes de seguir
+    // (bug reportado por el usuario, ver `Desenlace`).
+    expect(carrera.desenlacesPendientes[0]?.gano).toBe(true)
+    expect(carrera.desenlacesPendientes[0]?.iconos).toEqual(['anillo'])
+    // ...pero el cartel NO reemplaza el turno: la próxima decisión ya viene lista detrás
+    // (segundo bug reportado: "gané 3 títulos seguidos sin jugar").
+    expect(carrera.eventoPendiente).not.toBeNull()
+    expect(continuarCarrera(carrera).desenlacesPendientes).toHaveLength(0)
   })
 
-  it('errar la jugada final NO da el título, y el desenlace lo dice antes de seguir (bug reportado)', () => {
+  it('errar la jugada final NO da el título, y el cartel lo dice (bug reportado)', () => {
     let carrera = llegarANba()
     carrera = {
       ...carrera,
@@ -416,13 +418,13 @@ describe('motorCarrera', () => {
       resumenTemporada: { victorias: 55, derrotas: 27, clasifico: true },
     }
     const anillosPrevios = carrera.trofeos.anillos
-    // azar bajo a propósito: antes, la temporada SIGUIENTE se simulaba en el mismo llamado y
-    // podía salir campeona, así que errar el tiro igual mostraba el título.
-    carrera = elegirOpcion(carrera, 'triple', azarFijo(0.01), EQUIPOS_NBA)
+    // azar alto: las temporadas que se simulan después del tiro no clasifican, así se aísla
+    // que el tiro errado en sí no otorgó nada.
+    carrera = elegirOpcion(carrera, 'triple', azarFijo(0.99), EQUIPOS_NBA)
     expect(carrera.trofeos.anillos).toBe(anillosPrevios)
-    expect(carrera.desenlacePendiente?.gano).toBe(false)
-    expect(carrera.desenlacePendiente?.iconos).toEqual([])
-    expect(carrera.eventoPendiente).toBeNull()
+    // el primer cartel encolado es el del tiro errado, y dice que se perdió
+    expect(carrera.desenlacesPendientes[0]?.gano).toBe(false)
+    expect(carrera.desenlacesPendientes[0]?.iconos).toEqual([])
   })
 
   it('elegir "triple" en una jugada final perdida no suma anillo', () => {
@@ -486,15 +488,42 @@ describe('motorCarrera', () => {
     expect(ganada.jugador.ovr).toBeGreaterThan(perdida.jugador.ovr)
   })
 
+  it('un título NO reemplaza el turno: siempre queda una decisión detrás del cartel', () => {
+    // Bug real reportado: "gané 3 títulos seguidos sin jugar, me salieron 3 carteles de campeón".
+    // Pasaba porque el título cortaba el bloque de temporadas y cada "continuar" arrancaba una
+    // temporada nueva, así que un equipo dominante encadenaba campeonatos sin decisiones.
+    const base = llegarANba('intensa', azarFijo(0.99))
+    const dominante: Carrera = {
+      ...base,
+      clubActual: { id: 'super', nombre: 'Super Club', nivel: 99 },
+      // edad 26 -> no cae en año de Mundial ni de JJOO, así el test aísla el anillo
+      jugador: { ...base.jugador, ovr: 95, edad: 26, potencial: 99 },
+      eventoPendiente: null,
+      desenlacesPendientes: [],
+    }
+    // azar bajo: gana temporada regular y playoffs -> sale campeón
+    const conTitulo = avanzarSiCorresponde(dominante, EQUIPOS_NBA, azarFijo(0.02))
+    expect(conTitulo.desenlacesPendientes.length).toBeGreaterThan(0)
+    expect(conTitulo.desenlacesPendientes[0].iconos).toContain('anillo')
+    // la decisión del turno ya está lista detrás del cartel
+    expect(conTitulo.eventoPendiente).not.toBeNull()
+    // y descartar el cartel NO simula nada nuevo: la decisión sigue siendo la misma
+    const despues = continuarCarrera(conTitulo)
+    expect(despues.desenlacesPendientes).toHaveLength(0)
+    expect(despues.eventoPendiente).toBe(conTitulo.eventoPendiente)
+    expect(despues.historial).toHaveLength(conTitulo.historial.length)
+    expect(despues.trofeos.anillos).toBe(conTitulo.trofeos.anillos)
+  })
+
   it('en pre-nba con liga curada se puede salir campeón local, y frena la carrera para mostrarlo', () => {
     // Argentina tiene liga curada; azar bajo hace que el chequeo de título local pase.
     let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.01), EQUIPOS_NBA)
     expect(carrera.trofeos.ligaLocal).toBe(1)
-    expect(carrera.desenlacePendiente?.iconos).toEqual(['liga-local'])
+    expect(carrera.desenlacesPendientes[0]?.iconos).toEqual(['liga-local'])
     expect(carrera.historial.at(-1)?.trofeosGanados).toContain('liga-local')
     // el nombre de la liga real aparece en el texto del desenlace
-    expect(carrera.desenlacePendiente?.texto).toContain('Liga Nacional de Básquet')
+    expect(carrera.desenlacesPendientes[0]?.texto).toContain('Liga Nacional de Básquet')
   })
 
   it('sin liga doméstica curada (camino genérico) nunca hay título local', () => {
@@ -507,6 +536,9 @@ describe('motorCarrera', () => {
 
   it('ganar la decisión de convocatoria otorga el Mundial y lo marca en el historial', () => {
     const base = llegarANba('intensa', azarFijo(0.99))
+    // La fila del historial donde se está jugando el torneo: el Mundial se marca ahí, no en las
+    // temporadas que la simulación sigue empujando después de resolver la decisión.
+    const indiceTemporadaDelTorneo = base.historial.length - 1
     const carrera = elegirOpcion(
       {
         ...base,
@@ -526,8 +558,8 @@ describe('motorCarrera', () => {
       EQUIPOS_NBA,
     )
     expect(carrera.trofeos.mundial).toBe(base.trofeos.mundial + 1)
-    expect(carrera.desenlacePendiente?.gano).toBe(true)
-    expect(carrera.historial.at(-1)?.trofeosGanados).toContain('mundial')
+    expect(carrera.desenlacesPendientes[0]?.gano).toBe(true)
+    expect(carrera.historial[indiceTemporadaDelTorneo].trofeosGanados).toContain('mundial')
   })
 
   it('perder la decisión de convocatoria no otorga nada', () => {
@@ -551,7 +583,7 @@ describe('motorCarrera', () => {
       EQUIPOS_NBA,
     )
     expect(carrera.trofeos.jjoo).toBe(base.trofeos.jjoo)
-    expect(carrera.desenlacePendiente?.gano).toBe(false)
+    expect(carrera.desenlacesPendientes[0]?.gano).toBe(false)
   })
 
   it('una temporada NBA con OVR de nivel All-Star marca el ícono en esa fila del historial', () => {

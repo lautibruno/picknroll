@@ -26,20 +26,23 @@ function App() {
   // Resuelve la decisión y encadena directo a la próxima (ver motorCarrera.ts) — no hace
   // falta un paso "seguir jugando" separado, elegirOpcion ya deja la carrera lista con el
   // próximo evento pendiente o retirada.
-  function elegir(opcionId: string) {
-    if (!carrera) return
-    const siguiente = elegirOpcion(carrera, opcionId, Math.random, EQUIPOS_NBA)
+  // Si se retiró pero quedan carteles de título por ver, no salta al resumen todavía — así no
+  // se come el festejo del último título de la carrera.
+  function aplicar(siguiente: Carrera) {
     setCarrera(siguiente)
-    if (siguiente.retirado) setPantalla('retiro')
+    if (siguiente.retirado && siguiente.desenlacesPendientes.length === 0) setPantalla('retiro')
   }
 
-  // Los títulos/torneos frenan la carrera hasta que el jugador los ve (ver `Desenlace` en
-  // motorCarrera.ts) — este es el paso que la retoma.
+  function elegir(opcionId: string) {
+    if (!carrera) return
+    aplicar(elegirOpcion(carrera, opcionId, Math.random, EQUIPOS_NBA))
+  }
+
+  // Descarta el cartel de título que el jugador acaba de ver (ver `Desenlace` en
+  // motorCarrera.ts). La próxima decisión ya está lista detrás, no hace falta simular nada.
   function continuar() {
     if (!carrera) return
-    const siguiente = continuarCarrera(carrera, Math.random, EQUIPOS_NBA)
-    setCarrera(siguiente)
-    if (siguiente.retirado) setPantalla('retiro')
+    aplicar(continuarCarrera(carrera))
   }
 
   function nuevaCarrera() {

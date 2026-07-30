@@ -81,12 +81,16 @@ export type EventoPendiente =
 // que se ganó") — ver src/ui/iconosTrofeos.tsx para el dibujo de cada uno.
 export type IconoTrofeo = 'anillo' | 'allstar' | 'mvp' | 'mundial' | 'jjoo' | 'liga-local'
 
-// Momento de cierre que el jugador tiene que VER antes de que la carrera siga avanzando
-// (títulos y torneos: anillo, Mundial/JJOO, liga local). Bug real reportado por el usuario:
-// "me dio un tiro para definir ganar un anillo, elegí tirar de 3, salió errado y gané el
-// título igual" — pasaba porque al resolver la jugada final el motor seguía simulando la
-// temporada SIGUIENTE en el mismo llamado, y si ESA se ganaba, el campeonato aparecía pegado
-// al tiro errado. Ahora la resolución para acá y solo sigue cuando el jugador continúa.
+// Cartel de cierre de un título/torneo (anillo, Mundial/JJOO, liga local) que el jugador ve
+// antes de poder seguir. Existe por un bug real reportado: "elegí tirar de 3, salió errado y
+// gané el título igual" — el resultado de TU jugada quedaba tapado por lo que pasaba después.
+//
+// Ojo con el diseño: los desenlaces se ACUMULAN en una cola y NO reemplazan el turno. Segundo
+// bug real reportado ("gané 3 títulos seguidos sin jugar, me salieron 3 carteles de campeón"):
+// cuando un título cortaba el bloque de temporadas, cada "continuar" arrancaba una temporada
+// nueva y un equipo dominante encadenaba campeonatos sin que apareciera ni una decisión. Ahora
+// el bloque se juega completo, los títulos que salgan se encolan, y recién después viene la
+// próxima decisión — que ya está lista detrás de los carteles.
 export interface Desenlace {
   titulo: string
   texto: string
@@ -157,9 +161,9 @@ export interface Carrera {
   // firmar por un club nuevo (plantel nuevo, terreno neutro otra vez).
   rolForzado: Rol | null
   eventoPendiente: EventoPendiente | null
-  // Cierre de un título/torneo esperando que el jugador lo vea (ver `Desenlace`). Mientras
-  // esté seteado, la carrera NO avanza — se resuelve con `continuarCarrera`.
-  desenlacePendiente: Desenlace | null
+  // Cola de títulos/torneos esperando que el jugador los vea (ver `Desenlace`). No frenan la
+  // simulación: la próxima decisión ya viene resuelta detrás. Se vacían con `continuarCarrera`.
+  desenlacesPendientes: Desenlace[]
   historial: EntradaHistorial[]
   trofeos: Trofeos
   // Liga doméstica del jugador (según nacionalidad), con la imagen real de su título — solo
@@ -215,7 +219,7 @@ export function crearCarrera(
     especializacion: null,
     rolForzado: null,
     eventoPendiente: { tipo: 'club-liga-domestica', opciones: elegirEquiposOfrecidos(poolPreNba, ovr, azar) },
-    desenlacePendiente: null,
+    desenlacesPendientes: [],
     historial: [],
     trofeos: TROFEOS_INICIALES,
     ligaDomestica: usaLigaDomestica
@@ -262,33 +266,40 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
     const resumenBase = carrera.resumenTemporada ?? { victorias: 0, derrotas: 0, clasifico: true }
     const base = { ...carrera, eventoPendiente: null, estadoPlayoffsPendiente: null }
 
-    if (gano) {
-      return {
-        ...base,
-        trofeos: { ...carrera.trofeos, anillos: carrera.trofeos.anillos + 1 },
-        historial: conTrofeoEnUltimaTemporada(carrera.historial, 'anillo'),
-        resumenTemporada: { ...resumenBase, campeon: true },
-        desenlacePendiente: {
-          titulo: '¡Campeones!',
-          texto: `La metiste y ganaste la Final contra ${estado.rival}. Sos campeón de la NBA.`,
-          gano: true,
-          iconos: ['anillo'],
-        },
-      }
-    }
-    return {
-      ...base,
-      resumenTemporada: {
-        ...resumenBase,
-        eliminado: { ronda: estado.ronda, rival: estado.rival, marcador: '1-2' },
-      },
-      desenlacePendiente: {
-        titulo: 'Se escapó',
-        texto: `Erraste el tiro decisivo y ${estado.rival} se llevó la Final. Sin anillo esta vez.`,
-        gano: false,
-        iconos: [],
-      },
-    }
+    const conResultadoDelTiro: Carrera = gano
+      ? {
+          ...base,
+          trofeos: { ...carrera.trofeos, anillos: carrera.trofeos.anillos + 1 },
+          historial: conTrofeoEnUltimaTemporada(carrera.historial, 'anillo'),
+          resumenTemporada: { ...resumenBase, campeon: true },
+          desenlacesPendientes: [
+            ...carrera.desenlacesPendientes,
+            {
+              titulo: '¡Campeones!',
+              texto: `La metiste y ganaste la Final contra ${estado.rival}. Sos campeón de la NBA.`,
+              gano: true,
+              iconos: ['anillo'],
+            },
+          ],
+        }
+      : {
+          ...base,
+          resumenTemporada: {
+            ...resumenBase,
+            eliminado: { ronda: estado.ronda, rival: estado.rival, marcador: '1-2' },
+          },
+          desenlacesPendientes: [
+            ...carrera.desenlacesPendientes,
+            {
+              titulo: 'Se escapó',
+              texto: `Erraste el tiro decisivo y ${estado.rival} se llevó la Final. Sin anillo esta vez.`,
+              gano: false,
+              iconos: [],
+            },
+          ],
+        }
+
+    return avanzarSiCorresponde(conResultadoDelTiro, equiposNba, azar)
   }
 
   // Mundial / JJOO — ganarlo depende de esta decisión (pedido explícito del usuario). Mismo
@@ -301,30 +312,37 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
     const nombreTorneo = esMundial ? 'el Mundial' : 'los Juegos Olímpicos'
     const base = { ...carrera, eventoPendiente: null }
 
-    if (gano) {
-      return {
-        ...base,
-        trofeos: esMundial
-          ? { ...carrera.trofeos, mundial: carrera.trofeos.mundial + 1 }
-          : { ...carrera.trofeos, jjoo: carrera.trofeos.jjoo + 1 },
-        historial: conTrofeoEnUltimaTemporada(carrera.historial, icono),
-        desenlacePendiente: {
-          titulo: esMundial ? '¡Campeón del mundo!' : '¡Medalla de oro!',
-          texto: `Saliste campeón de ${nombreTorneo} con tu selección.`,
-          gano: true,
-          iconos: [icono],
-        },
-      }
-    }
-    return {
-      ...base,
-      desenlacePendiente: {
-        titulo: 'Sin título',
-        texto: `Se te escapó ${nombreTorneo} con tu selección.`,
-        gano: false,
-        iconos: [],
-      },
-    }
+    const conResultadoDelTorneo: Carrera = gano
+      ? {
+          ...base,
+          trofeos: esMundial
+            ? { ...carrera.trofeos, mundial: carrera.trofeos.mundial + 1 }
+            : { ...carrera.trofeos, jjoo: carrera.trofeos.jjoo + 1 },
+          historial: conTrofeoEnUltimaTemporada(carrera.historial, icono),
+          desenlacesPendientes: [
+            ...carrera.desenlacesPendientes,
+            {
+              titulo: esMundial ? '¡Campeón del mundo!' : '¡Medalla de oro!',
+              texto: `Saliste campeón de ${nombreTorneo} con tu selección.`,
+              gano: true,
+              iconos: [icono],
+            },
+          ],
+        }
+      : {
+          ...base,
+          desenlacesPendientes: [
+            ...carrera.desenlacesPendientes,
+            {
+              titulo: 'Sin título',
+              texto: `Se te escapó ${nombreTorneo} con tu selección.`,
+              gano: false,
+              iconos: [],
+            },
+          ],
+        }
+
+    return avanzarSiCorresponde(conResultadoDelTorneo, equiposNba, azar)
   }
 
   // Decisión de riesgo — rehecha jugando Copero: NO mueve el OVR directo, cambia el ROL
@@ -409,15 +427,16 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
   )
 }
 
-// Retoma la carrera después de que el jugador vio un desenlace (título/torneo). Es el único
-// camino para salir de un `desenlacePendiente` — ver el comentario de `Desenlace`.
-export function continuarCarrera(carrera: Carrera, azar: Azar, equiposNba: Equipo[]): Carrera {
-  if (!carrera.desenlacePendiente) return carrera
-  return avanzarSiCorresponde({ ...carrera, desenlacePendiente: null }, equiposNba, azar)
+// Descarta el cartel de título que el jugador acaba de ver y deja el siguiente de la cola (si
+// hay). NO avanza la carrera: la próxima decisión ya venía resuelta detrás de los carteles —
+// ver el comentario de `Desenlace` para por qué es así y no al revés.
+export function continuarCarrera(carrera: Carrera): Carrera {
+  if (carrera.desenlacesPendientes.length === 0) return carrera
+  return { ...carrera, desenlacesPendientes: carrera.desenlacesPendientes.slice(1) }
 }
 
 export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], azar: Azar): Carrera {
-  if (carrera.retirado || carrera.eventoPendiente || carrera.desenlacePendiente) return carrera
+  if (carrera.retirado || carrera.eventoPendiente) return carrera
 
   let jugador = carrera.jugador
   let trofeos = carrera.trofeos
@@ -425,6 +444,9 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
   let temporadasEnClub = carrera.temporadasEnClubActual
   const historial: EntradaHistorial[] = [...carrera.historial]
   const nivelClub = carrera.clubActual?.nivel ?? null
+  // Títulos que salgan durante este bloque de temporadas — se acumulan y se muestran junto con
+  // la próxima decisión, sin cortar la simulación (ver `Desenlace`).
+  const desenlaces: Desenlace[] = [...carrera.desenlacesPendientes]
 
   // Cierra el turno: calcula cuánto cambió el OVR desde que se generó la decisión anterior
   // (el ancla guardada en `carrera.ovrAlIniciarDecision`) y deja un ancla nueva para la
@@ -439,26 +461,10 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       resumenTemporada,
       temporadasEnClubActual: temporadasEnClub,
       eventoPendiente,
+      desenlacesPendientes: desenlaces,
       ultimoCambioOvr: jugador.ovr - carrera.ovrAlIniciarDecision,
       ovrAlIniciarDecision: jugador.ovr,
       ...extra,
-    }
-  }
-
-  // Igual que `conProximaDecision` pero para cortar en un título/torneo que el jugador tiene
-  // que ver antes de que la carrera siga (ver `Desenlace`).
-  function conDesenlace(desenlace: Desenlace): Carrera {
-    return {
-      ...carrera,
-      jugador,
-      historial,
-      trofeos,
-      resumenTemporada,
-      temporadasEnClubActual: temporadasEnClub,
-      eventoPendiente: null,
-      desenlacePendiente: desenlace,
-      ultimoCambioOvr: jugador.ovr - carrera.ovrAlIniciarDecision,
-      ovrAlIniciarDecision: jugador.ovr,
     }
   }
 
@@ -505,7 +511,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
         ...historial[historial.length - 1],
         trofeosGanados: [...historial[historial.length - 1].trofeosGanados, 'liga-local'],
       }
-      return conDesenlace({
+      desenlaces.push({
         titulo: '¡Campeón!',
         texto: `Saliste campeón de la ${carrera.ligaDomestica.nombreLiga} con ${carrera.clubActual.nombre}.`,
         gano: true,
@@ -513,16 +519,6 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
       })
     }
 
-    // Convocatoria a la selección (Mundial/JJOO) — ser convocado depende del calendario y de
-    // tu OVR; ganarlo, de la decisión que tomes (pedido explícito del usuario).
-    const torneo: TorneoSeleccion | null = convocatoriaDisponible(
-      jugadorAnterior.ovr,
-      jugadorAnterior.edad,
-      carrera.fase,
-    )
-    if (torneo) {
-      return conProximaDecision({ tipo: 'convocatoria', decision: generarDecisionConvocatoria(torneo, azar) })
-    }
 
     // Temporada regular + playoffs simulados — solo en fase NBA (pedido del usuario:
     // "implementar para jugar playoffs... cuando clasificamos que haya una simulación de
@@ -555,20 +551,32 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
           resumenTemporada = { ...regular, campeon: true }
           const ultima = historial[historial.length - 1]
           historial[historial.length - 1] = { ...ultima, trofeosGanados: [...ultima.trofeosGanados, 'anillo'] }
-          // El anillo también corta acá: si no, el campeonato quedaba tapado por la temporada
-          // siguiente que este mismo bloque simula a continuación.
-          return conDesenlace({
+          desenlaces.push({
             titulo: '¡Campeones!',
             texto: `Ganaste la Final contra ${resultado.rival}. Sos campeón de la NBA.`,
             gano: true,
             iconos: ['anillo'],
           })
-        }
-        resumenTemporada = {
-          ...regular,
-          eliminado: { ronda: resultado.ronda, rival: resultado.rival, marcador: resultado.marcador },
+        } else {
+          resumenTemporada = {
+            ...regular,
+            eliminado: { ronda: resultado.ronda, rival: resultado.rival, marcador: resultado.marcador },
+          }
         }
       }
+    }
+
+    // Convocatoria a la selección (Mundial/JJOO) — ser convocado depende del calendario y de tu
+    // OVR; ganarlo, de la decisión que tomes (pedido explícito del usuario). Va DESPUÉS de la
+    // temporada y los playoffs, como en la realidad (la selección juega en el receso) — antes
+    // estaba antes y en año de Mundial te salteabas los playoffs de esa temporada.
+    const torneo: TorneoSeleccion | null = convocatoriaDisponible(
+      jugadorAnterior.ovr,
+      jugadorAnterior.edad,
+      carrera.fase,
+    )
+    if (torneo) {
+      return conProximaDecision({ tipo: 'convocatoria', decision: generarDecisionConvocatoria(torneo, azar) })
     }
 
     if (jugador.edad >= EDAD_RETIRO) {
@@ -581,7 +589,7 @@ export function avanzarSiCorresponde(carrera: Carrera, equiposNba: Equipo[], aza
         temporadasEnClubActual: temporadasEnClub,
         retirado: true,
         eventoPendiente: null,
-        desenlacePendiente: null,
+        desenlacesPendientes: desenlaces,
       }
     }
 
