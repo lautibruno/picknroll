@@ -7,6 +7,7 @@ import { useNumeroAnimado } from './useNumeroAnimado'
 import { OPCIONES_JUGADA_FINAL, nombreRonda } from '../engine/playoffs'
 import { OPCIONES_CONVOCATORIA } from '../engine/convocatorias'
 import { ICONOS_TROFEO, ETIQUETA_TROFEO, IconoLigaLocal } from './iconosTrofeos'
+import { abreviarNombre } from './abreviarNombre'
 
 const DURACION_CARTEL_TROFEOS_MS = 2800
 
@@ -40,11 +41,6 @@ const TITULOS_EVENTO: Record<string, string> = {
   'club-liga-domestica': 'CANTERA',
   draft: 'DRAFT NBA',
   trade: 'AGENCIA LIBRE',
-}
-
-function abreviarNombre(nombre: string): string {
-  const primeraPalabra = nombre.replace(/\(.*\)/, '').trim().split(/\s+/)[0]
-  return primeraPalabra.slice(0, 3).toUpperCase()
 }
 
 function OvrAnimado({ objetivo, inicial }: { objetivo: number; inicial: number }) {

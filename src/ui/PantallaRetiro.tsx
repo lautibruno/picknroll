@@ -2,7 +2,8 @@ import { useState } from 'react'
 import type { Carrera } from '../engine/motorCarrera'
 import { calcularVeredicto } from '../engine/veredicto'
 import { resumirRecorrido } from '../engine/recorrido'
-import { armarResumenCarrera, armarTextoCompartir, codificarResumen } from '../engine/compartirCarrera'
+import { armarResumenCarrera, armarTextoCompartir } from '../engine/compartirCarrera'
+import { generarImagenCompartir } from './generarImagenCompartir'
 import { ICONOS_TROFEO, IconoLigaLocal } from './iconosTrofeos'
 import { VitrinaTrofeos } from './VitrinaTrofeos'
 
@@ -12,34 +13,66 @@ interface PantallaRetiroProps {
   onNuevaCarrera: () => void
 }
 
+function descargarImagen(blob: Blob) {
+  const url = URL.createObjectURL(blob)
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = 'picknroll-carrera.png'
+  enlace.click()
+  URL.revokeObjectURL(url)
+}
+
 export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: PantallaRetiroProps) {
-  const [copiado, setCopiado] = useState(false)
+  const [estado, setEstado] = useState<'listo' | 'generando' | 'copiado'>('listo')
   const resumen = armarResumenCarrera(carrera, nombreCompleto)
-  // El link lleva el resumen entero codificado (ver compartirCarrera.ts) — WhatsApp arma el
-  // preview con la imagen real de esta carrera (api/carrera-imagen.ts) a partir de él, sin
-  // que haga falta guardar nada en un servidor.
-  const urlCompartible = `${window.location.origin}/carrera?d=${codificarResumen(resumen)}`
-  const texto = armarTextoCompartir(resumen, urlCompartible)
+  // Link limpio, sin ningún dato codificado (pedido explícito del usuario: "no quiero un
+  // link gigantesco") — la imagen con los datos de la carrera viaja como archivo adjunto al
+  // compartir, no en la URL. Ver generarImagenCompartir.ts.
+  const url = window.location.origin
+  const texto = armarTextoCompartir(resumen, url)
   const picoOvr = resumen.picoOvr
   const totalPj = carrera.historial.reduce((acc, h) => acc + h.pj, 0)
   const veredicto = calcularVeredicto(carrera)
   const recorrido = resumirRecorrido(carrera.historial)
 
   async function compartir() {
+    setEstado('generando')
+    const blob = await generarImagenCompartir(resumen)
+    const archivo = blob ? new File([blob], 'picknroll-carrera.png', { type: 'image/png' }) : null
+
+    // Compartir la imagen como archivo adjunto (junto con el texto, que ya lleva el link) es
+    // lo que hace que se vea como una tarjeta real en WhatsApp — no un link pelado.
+    if (archivo && navigator.canShare?.({ files: [archivo] })) {
+      try {
+        await navigator.share({ files: [archivo], text: texto })
+        setEstado('listo')
+        return
+      } catch {
+        // el usuario canceló el share nativo — no hace falta caer a nada más
+        setEstado('listo')
+        return
+      }
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({ title: `${nombreCompleto} — PickNRoll`, text: texto })
+        setEstado('listo')
         return
       } catch {
-        // el usuario canceló el share nativo, o el navegador lo rechazó — cae al copiado
+        // cae al copiado/descarga de abajo
       }
     }
+
+    // Sin Web Share API (típicamente desktop): descarga la imagen y copia el texto, para que
+    // el usuario los pegue juntos a mano donde quiera compartirlos.
+    if (blob) descargarImagen(blob)
     try {
       await navigator.clipboard.writeText(texto)
-      setCopiado(true)
-      setTimeout(() => setCopiado(false), 2000)
+      setEstado('copiado')
+      setTimeout(() => setEstado('listo'), 2000)
     } catch {
-      setCopiado(false)
+      setEstado('listo')
     }
   }
 
@@ -152,9 +185,10 @@ export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: Pant
           <button
             type="button"
             onClick={compartir}
-            className="flex-1 bg-hueso px-4 py-3.5 text-center font-titulo text-sm font-semibold tracking-[0.14em] text-fondo"
+            disabled={estado === 'generando'}
+            className="flex-1 bg-hueso px-4 py-3.5 text-center font-titulo text-sm font-semibold tracking-[0.14em] text-fondo disabled:opacity-60"
           >
-            {copiado ? 'COPIADO ✓' : 'COMPARTIR'}
+            {estado === 'generando' ? 'GENERANDO…' : estado === 'copiado' ? 'COPIADO ✓' : 'COMPARTIR'}
           </button>
           <button
             type="button"

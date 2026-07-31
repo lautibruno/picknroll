@@ -1,3 +1,0 @@
-{
-  "rewrites": [{ "source": "/carrera", "destination": "/api/carrera" }]
-}
