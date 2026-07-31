@@ -4,8 +4,10 @@ const POSICIONES = [
   { id: 'PG', nombre: 'Base', top: '20%', left: '50%' },
   { id: 'SG', nombre: 'Escolta', top: '42%', left: '82%' },
   { id: 'SF', nombre: 'Alero', top: '42%', left: '18%' },
-  { id: 'PF', nombre: 'Ala-pívot', top: '76%', left: '68%' },
-  { id: 'C', nombre: 'Pívot', top: '84%', left: '50%' },
+  // El pívot va cerca del aro pero sin taparlo (el aro y la zona restringida se dibujan
+  // alrededor de y=90% del alto de la cancha).
+  { id: 'PF', nombre: 'Ala-pívot', top: '73%', left: '70%' },
+  { id: 'C', nombre: 'Pívot', top: '78%', left: '47%' },
 ] as const
 
 interface PasoPosicionProps {
@@ -33,26 +35,78 @@ export function PasoPosicion({ onContinuar, onVolver }: PasoPosicionProps) {
           TOCÁ UN PUNTO DE LA CANCHA
         </div>
 
+        {/* Piso de parquet de maple, brillante (pedido del usuario: "más madera, más estética,
+            más brillante y REAL"). Se arma por capas: tono base cálido + variación de tabla a
+            tabla + veta fina + juntas entre tablas + brillo especular del barniz. */}
         <div
           className="relative mb-8 aspect-[3/4] w-full overflow-hidden border-2 border-hueso/25"
           style={{
-            backgroundImage:
-              'linear-gradient(135deg, rgba(245,241,232,0.14), transparent 45%), repeating-linear-gradient(90deg, #4a3620 0 34px, #3f2e18 34px 36px), linear-gradient(160deg, #5a4126, #2a1d10)',
+            backgroundImage: [
+              // brillo del barniz (reflejo diagonal ancho)
+              'linear-gradient(112deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.06) 20%, transparent 38%, transparent 60%, rgba(255,255,255,0.10) 74%, rgba(255,255,255,0.02) 84%, transparent 95%)',
+              // veta fina de la madera
+              'repeating-linear-gradient(90deg, rgba(88,52,18,0.13) 0 1px, transparent 1px 6px)',
+              // juntas entre tablas
+              'repeating-linear-gradient(90deg, rgba(58,33,10,0.5) 0 2px, transparent 2px 27px)',
+              // variación de tono tabla por tabla (para que no se vea plano/repetido)
+              'repeating-linear-gradient(90deg, rgba(255,206,142,0.11) 0 27px, transparent 27px 54px, rgba(124,72,26,0.12) 54px 81px, transparent 81px 108px)',
+              // tono base del maple
+              'linear-gradient(172deg, #e0a259 0%, #cd8b41 42%, #ab6c2c 100%)',
+            ].join(', '),
           }}
         >
-          <svg viewBox="0 0 300 400" className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
-            <g stroke="rgba(245,241,232,0.55)" strokeWidth="2.5" fill="none">
+          {/* Media cancha en vertical: el aro está ABAJO. La línea de triple ahora rodea ese aro
+              — antes estaba dibujada en el extremo opuesto (bug reportado por el usuario). */}
+          <svg viewBox="0 0 300 400" className="absolute inset-0 h-full w-full">
+            <defs>
+              {/* Las líneas están pintadas SOBRE la madera: llevan una sombra mínima para que se
+                  apoyen en el piso en vez de flotar. */}
+              <filter id="lineaPintada" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="1.2" stdDeviation="0.8" floodColor="#3a2109" floodOpacity="0.55" />
+              </filter>
+            </defs>
+
+            <g
+              stroke="rgba(252,250,245,0.92)"
+              strokeWidth="2.6"
+              fill="none"
+              strokeLinecap="round"
+              filter="url(#lineaPintada)"
+            >
+              {/* Perímetro y línea de mitad de cancha (arriba), con su círculo central */}
               <rect x="10" y="10" width="280" height="380" />
-              <circle cx="150" cy="10" r="55" strokeDasharray="0" />
-              <rect x="95" y="290" width="110" height="100" />
-              <circle cx="150" cy="290" r="40" />
-              <path d="M20,90 A130,130 0 0 0 280,90" />
-              <line x1="20" y1="10" x2="20" y2="90" />
-              <line x1="280" y1="10" x2="280" y2="90" />
-              <circle cx="150" cy="370" r="10" />
-              <line x1="130" y1="370" x2="170" y2="370" strokeWidth="4" />
+              <circle cx="150" cy="10" r="52" />
+
+              {/* Zona pintada, línea y círculo de tiros libres */}
+              <rect x="106" y="300" width="88" height="90" />
+              <circle cx="150" cy="300" r="44" />
+
+              {/* Línea de triple: dos rectas desde la línea de fondo + arco alrededor del aro */}
+              <line x1="30" y1="390" x2="30" y2="330" />
+              <line x1="270" y1="390" x2="270" y2="330" />
+              <path d="M30,330 A126,126 0 0 1 270,330" />
+
+              {/* Aro, tablero y semicírculo de la zona restringida */}
+              <line x1="128" y1="377" x2="172" y2="377" strokeWidth="4.5" />
+              <circle cx="150" cy="368" r="7" strokeWidth="2.2" />
+              <path d="M128,368 A22,22 0 0 1 172,368" strokeWidth="2" />
+
+              {/* Marcas de posiciones de rebote sobre la zona */}
+              <line x1="106" y1="352" x2="98" y2="352" strokeWidth="3" />
+              <line x1="194" y1="352" x2="202" y2="352" strokeWidth="3" />
+              <line x1="106" y1="332" x2="98" y2="332" strokeWidth="3" />
+              <line x1="194" y1="332" x2="202" y2="332" strokeWidth="3" />
             </g>
           </svg>
+
+          {/* Viñeta: oscurece los bordes para dar profundidad y que el brillo del centro resalte */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse at 50% 42%, transparent 40%, rgba(38,20,6,0.28) 78%, rgba(24,12,3,0.5) 100%)',
+            }}
+          />
 
           {POSICIONES.map((p) => (
             <button

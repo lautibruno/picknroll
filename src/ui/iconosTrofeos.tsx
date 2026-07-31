@@ -14,6 +14,11 @@ interface IconoProps {
 
 const URL_ANILLO = 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Larry_O%27Brien_Championship_Trophy_icon.svg'
 const URL_MUNDIAL = 'https://upload.wikimedia.org/wikipedia/commons/0/07/FIBA_Basketball_World_Cup_logo.svg'
+// Logo real del All-Star Game: la estrella con el logoman (pedido explícito del usuario, que
+// pasó la imagen). Este es el ÚNICO trofeo que se sirve desde `public/` en vez de Wikimedia —
+// se buscó ahí y solo existen los logos por año/ciudad (2018, 2019, 2022, 2023, 2025...), no la
+// marca permanente. El archivo lo aportó el usuario: public/trofeos/all-star.png
+const URL_ALL_STAR = '/trofeos/all-star.png'
 // Medalla de oro real (no los aros olímpicos, que son el logo del evento, no el premio en sí
 // — pedido explícito del usuario: "si es oro olímpico, medalla olímpica").
 const URL_JJOO = 'https://upload.wikimedia.org/wikipedia/commons/4/4f/Gold_medal_olympic.svg'
@@ -23,11 +28,7 @@ export function IconoAnillo({ className }: IconoProps) {
 }
 
 export function IconoAllStar({ className }: IconoProps) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" stroke="none">
-      <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.4l-5.9 3.2 1.3-6.6L2.5 9.4l6.6-.8z" />
-    </svg>
-  )
+  return <img src={URL_ALL_STAR} alt="Logo del All-Star Game" className={`object-contain ${className ?? ''}`} />
 }
 
 export function IconoMvp({ className }: IconoProps) {

@@ -22,9 +22,17 @@ const CLAVE_TROFEO: Record<IconoTrofeo, keyof Carrera['trofeos']> = {
 
 const ORDEN: IconoTrofeo[] = ['anillo', 'mvp', 'allstar', 'mundial', 'jjoo', 'liga-local']
 
-// Cuántas piezas se dibujan como máximo por grupo antes de resumir el resto con "+N" — más
-// que esto y el estante se vuelve ilegible.
-const PIEZAS_VISIBLES_POR_GRUPO = 3
+// Se muestran TODAS las piezas ganadas (pedido explícito del usuario), superpuestas una al lado
+// de la otra. El solapamiento se adapta a la cantidad: pocas quedan separadas y aireadas, y a
+// medida que son más se van montando entre sí para que entren en el estante sin encogerse.
+// Devuelve el margen izquierdo (en px) que lleva cada pieza después de la primera.
+const SOLAPE_MAXIMO = 34
+
+function solapeDe(cantidad: number): number {
+  if (cantidad <= 2) return 8 // dos trofeos: separados, se lucen
+  if (cantidad === 3) return 0 // apenas tocándose
+  return Math.max(-SOLAPE_MAXIMO, -4 * (cantidad - 3))
+}
 
 interface Grupo {
   icono: IconoTrofeo
@@ -172,10 +180,9 @@ function GrupoDeTrofeos({
   activo: boolean
   onTocar: () => void
 }) {
-  const visibles = Math.min(grupo.cantidad, PIEZAS_VISIBLES_POR_GRUPO)
-  const resto = grupo.cantidad - visibles
   const Icono = ICONOS_TROFEO[grupo.icono]
   const etiqueta = ETIQUETA_TROFEO[grupo.icono]
+  const solape = solapeDe(grupo.cantidad)
 
   return (
     <button
@@ -185,13 +192,19 @@ function GrupoDeTrofeos({
       aria-label={`${etiqueta}: ${grupo.cantidad}`}
       // `items-end` + sin nada debajo de las piezas: así quedan APOYADAS en la tabla del
       // estante en vez de flotando (el contador va como badge absoluto, no en el flujo).
-      className="group relative flex cursor-pointer items-end gap-1 bg-transparent pb-0"
+      className="group relative flex max-w-full cursor-pointer items-end bg-transparent pb-0"
     >
-      {Array.from({ length: visibles }, (_, i) => (
+      {Array.from({ length: grupo.cantidad }, (_, i) => (
         <span
           key={i}
-          className="animar-trofeo relative block"
-          style={{ animationDelay: `${retraso + i * 90}ms`, transformOrigin: 'bottom center' }}
+          className="animar-trofeo relative block shrink-0"
+          style={{
+            animationDelay: `${retraso + i * 70}ms`,
+            transformOrigin: 'bottom center',
+            marginLeft: i === 0 ? 0 : `${solape}px`,
+            // Las de adelante tapan a las de atrás, como trofeos apoyados en fila
+            zIndex: i,
+          }}
         >
           {/* Foco de luz del estante — sin esto, un trofeo/logo oscuro desaparece contra el
               fondo negro del mueble (pasó de verdad con el logo de la LNB al verificar). */}
@@ -201,17 +214,20 @@ function GrupoDeTrofeos({
               background: 'radial-gradient(ellipse at 50% 65%, rgba(245,241,232,0.16), transparent 70%)',
             }}
           />
+          {/* Alto fijo y ancho libre: cada trofeo real tiene su propia proporción (la copa
+              O'Brien es alta y angosta, el logo del All-Star es ancho y bajo). Forzarlos a un
+              cuadrado dejaba a los anchos diminutos. */}
           {grupo.url ? (
             <img
               src={grupo.url}
               alt={etiqueta}
-              className={`relative h-14 w-11 object-contain object-bottom transition-transform sm:h-16 sm:w-12 ${
+              className={`relative h-14 w-auto max-w-[76px] object-contain object-bottom transition-transform sm:h-16 sm:max-w-[86px] ${
                 activo ? 'scale-110' : 'group-hover:scale-105'
               }`}
             />
           ) : (
             <Icono
-              className={`relative h-14 w-11 text-acento transition-transform sm:h-16 sm:w-12 ${
+              className={`relative h-14 w-auto max-w-[76px] text-acento transition-transform sm:h-16 sm:max-w-[86px] ${
                 activo ? 'scale-110' : 'group-hover:scale-105'
               }`}
             />
@@ -220,7 +236,6 @@ function GrupoDeTrofeos({
           <span className="absolute bottom-0 left-1/2 h-[4px] w-7 -translate-x-1/2 rounded-[50%] bg-black/70" />
         </span>
       ))}
-      {resto > 0 && <span className="mb-1 font-marcador text-lg leading-none text-acento/80">+{resto}</span>}
       {grupo.cantidad > 1 && (
         <span
           className={`absolute -top-1 right-0 px-1 font-mono-stats text-[9px] leading-none transition-colors ${

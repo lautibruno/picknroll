@@ -214,7 +214,7 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
             <div className="flex gap-3">
               {cartelTrofeos.map((t, i) => {
                 const Icono = ICONOS_TROFEO[t]
-                return <Icono key={i} className="h-11 w-11 text-acento sm:h-14 sm:w-14" />
+                return <Icono key={i} className="h-12 w-auto max-w-36 text-acento sm:h-16" />
               })}
             </div>
             <div className="font-titulo text-base font-bold uppercase tracking-wide text-hueso sm:text-lg">
@@ -235,11 +235,11 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
               <div className="mb-4 flex justify-center gap-3">
                 {desenlace.iconos.map((t, i) =>
                   t === 'liga-local' ? (
-                    <IconoLigaLocal key={i} className="h-16 w-16" url={carrera.ligaDomestica?.trofeoUrl} />
+                    <IconoLigaLocal key={i} className="h-16 w-auto max-w-28" url={carrera.ligaDomestica?.trofeoUrl} />
                   ) : (
                     (() => {
                       const Icono = ICONOS_TROFEO[t]
-                      return <Icono key={i} className="h-16 w-16 text-acento" />
+                      return <Icono key={i} className="h-16 w-auto max-w-28 text-acento" />
                     })()
                   ),
                 )}
@@ -308,7 +308,7 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
                 const Icono = ICONOS_TROFEO[t]
                 return (
                   <span key={`${t}-${cantidad}`} className="animar-trofeo flex items-center gap-0.5 text-acento">
-                    <Icono className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <Icono className="h-4 w-auto max-w-7 sm:h-[18px]" />
                     <span className="font-mono-stats text-[9px] sm:text-[10px]">{cantidad}</span>
                   </span>
                 )
@@ -588,11 +588,11 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
                   {entrada.trofeosGanados.map((t, ti) =>
                     // El título local usa la imagen real de la liga del jugador, no un ícono fijo
                     t === 'liga-local' ? (
-                      <IconoLigaLocal key={ti} className="h-3 w-3" url={carrera.ligaDomestica?.trofeoUrl} />
+                      <IconoLigaLocal key={ti} className="h-3.5 w-auto max-w-6" url={carrera.ligaDomestica?.trofeoUrl} />
                     ) : (
                       (() => {
                         const Icono = ICONOS_TROFEO[t]
-                        return <Icono key={ti} className="h-3 w-3 text-acento" />
+                        return <Icono key={ti} className="h-3.5 w-auto max-w-6 text-acento" />
                       })()
                     ),
                   )}

@@ -13,6 +13,15 @@ interface PasoCamisetaProps {
   onVolver: () => void
 }
 
+// Geometría de la musculosa, en un solo lugar para que el contorno y los ribetes coincidan.
+// Hombros angostos, sisas profundas y curvas, escote redondo y un leve vuelo en el ruedo.
+const ESCOTE = 'M144,28 Q120,58 96,28'
+const SISA_IZQ = 'M74,26 C62,54 52,84 48,116'
+const SISA_DER = 'M192,116 C188,84 178,54 166,26'
+const RUEDO = 'M46,262 Q120,278 194,262'
+const CONTORNO_MUSCULOSA =
+  'M74,26 C62,54 52,84 48,116 L46,262 Q120,278 194,262 L192,116 C188,84 178,54 166,26 L144,28 Q120,58 96,28 Z'
+
 function colorTexto(hexFondo: string): string {
   // contraste simple: fondo claro -> texto oscuro, fondo oscuro -> texto hueso
   const r = parseInt(hexFondo.slice(1, 3), 16)
@@ -104,41 +113,74 @@ export function PasoCamiseta({ codigoPais, onContinuar, onVolver }: PasoCamiseta
         </div>
 
         <div className="flex items-center justify-center border-t-2 border-hueso/15 bg-superficie-alta/30 p-6 sm:border-l-2 sm:border-t-0">
-          <svg viewBox="0 0 240 280" className="w-full max-w-[220px] drop-shadow-lg">
-            <path
-              d="M60,10 L100,10 Q120,26 140,10 L180,10 L215,58 L182,80 L182,270 L58,270 L58,80 L25,58 Z"
-              fill={primario}
-              stroke={secundario}
-              strokeWidth="6"
-            />
-            <path
-              d="M100,10 Q120,26 140,10"
-              fill="none"
-              stroke={secundario}
-              strokeWidth="8"
-              strokeLinecap="round"
-            />
-            <rect x="58" y="80" width="10" height="190" fill={secundario} />
-            <rect x="172" y="80" width="10" height="190" fill={secundario} />
+          {/* Musculosa de básquet realista (pedido explícito del usuario) — sin mangas, sisas
+              profundas, escote redondo, ribetes en el color secundario, tela de malla y sombreado
+              de pliegues. `SISA_*` y `ESCOTE` se reusan para el contorno y para los ribetes, así
+              el borde y la costura siempre coinciden. */}
+          <svg viewBox="0 0 240 300" className="w-full max-w-[220px]">
+            <defs>
+              <clipPath id="recorteMusculosa">
+                <path d={CONTORNO_MUSCULOSA} />
+              </clipPath>
+              {/* Luz desde arriba-izquierda y caída de sombra hacia abajo-derecha */}
+              <linearGradient id="sombraTela" x1="0" y1="0" x2="0.85" y2="1">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
+                <stop offset="42%" stopColor="#ffffff" stopOpacity="0" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.34" />
+              </linearGradient>
+              {/* Malla deportiva: agujeritos regulares, apenas visibles */}
+              <pattern id="mallaTela" width="6" height="6" patternUnits="userSpaceOnUse">
+                <circle cx="3" cy="3" r="1.15" fill="#000000" opacity="0.13" />
+              </pattern>
+              <filter id="sombraMusculosa" x="-25%" y="-15%" width="150%" height="140%">
+                <feDropShadow dx="3" dy="8" stdDeviation="7" floodColor="#000000" floodOpacity="0.55" />
+              </filter>
+            </defs>
+
+            <g filter="url(#sombraMusculosa)">
+              <path d={CONTORNO_MUSCULOSA} fill={primario} />
+
+              <g clipPath="url(#recorteMusculosa)">
+                <rect width="240" height="300" fill="url(#mallaTela)" />
+                {/* Paneles laterales, como las musculosas de verdad */}
+                <path d="M46,120 L64,118 L62,266 L46,258 Z" fill={secundario} opacity="0.85" />
+                <path d="M194,120 L176,118 L178,266 L194,258 Z" fill={secundario} opacity="0.85" />
+                {/* Pliegues de la tela */}
+                <path d="M98,64 Q108,170 100,266" stroke="#ffffff" strokeOpacity="0.09" strokeWidth="11" fill="none" />
+                <path d="M150,70 Q142,175 152,266" stroke="#000000" strokeOpacity="0.09" strokeWidth="9" fill="none" />
+                <rect width="240" height="300" fill="url(#sombraTela)" />
+              </g>
+
+              {/* Ribetes: escote y sisas. Van por encima del recorte para que se lean como costura */}
+              <path d={ESCOTE} fill="none" stroke={secundario} strokeWidth="8" strokeLinecap="round" />
+              <path d={SISA_IZQ} fill="none" stroke={secundario} strokeWidth="6.5" strokeLinecap="round" />
+              <path d={SISA_DER} fill="none" stroke={secundario} strokeWidth="6.5" strokeLinecap="round" />
+              <path d={RUEDO} fill="none" stroke={secundario} strokeWidth="5" strokeLinecap="round" />
+            </g>
+
             <text
               x="120"
-              y="115"
+              y="120"
               textAnchor="middle"
               fontFamily="Oswald, sans-serif"
               fontWeight={600}
-              fontSize="16"
-              letterSpacing="1"
+              fontSize="17"
+              letterSpacing="1.6"
               fill={colorNumero}
             >
               {apellido || 'APELLIDO'}
             </text>
+            {/* Número con contorno, como los dorsales reales */}
             <text
               x="120"
-              y="210"
+              y="225"
               textAnchor="middle"
               fontFamily="'Bebas Neue', sans-serif"
-              fontSize="90"
+              fontSize="104"
               fill={colorNumero}
+              stroke={secundario}
+              strokeWidth="2.6"
+              paintOrder="stroke"
             >
               {dorsal || '0'}
             </text>

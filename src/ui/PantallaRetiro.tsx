@@ -123,11 +123,11 @@ export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: Pant
                     <span className="flex shrink-0 items-center gap-0.5">
                       {paso.trofeos.map((t, ti) =>
                         t === 'liga-local' ? (
-                          <IconoLigaLocal key={ti} className="h-3.5 w-3.5" url={carrera.ligaDomestica?.trofeoUrl} />
+                          <IconoLigaLocal key={ti} className="h-4 w-auto max-w-7" url={carrera.ligaDomestica?.trofeoUrl} />
                         ) : (
                           (() => {
                             const Icono = ICONOS_TROFEO[t]
-                            return <Icono key={ti} className="h-3.5 w-3.5 text-acento" />
+                            return <Icono key={ti} className="h-4 w-auto max-w-7 text-acento" />
                           })()
                         ),
                       )}
