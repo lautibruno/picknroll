@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Carrera } from '../engine/motorCarrera'
 import { calcularVeredicto } from '../engine/veredicto'
 import { resumirRecorrido } from '../engine/recorrido'
+import { armarResumenCarrera, armarTextoCompartir, codificarResumen } from '../engine/compartirCarrera'
 import { ICONOS_TROFEO, IconoLigaLocal } from './iconosTrofeos'
 import { VitrinaTrofeos } from './VitrinaTrofeos'
 
@@ -11,29 +12,28 @@ interface PantallaRetiroProps {
   onNuevaCarrera: () => void
 }
 
-function armarTextoCompartir(carrera: Carrera, nombreCompleto: string): string {
-  const temporadas = carrera.historial.length
-  const picoOvr = Math.max(0, ...carrera.historial.map((h) => h.ovr), carrera.jugador.ovr)
-  const veredicto = calcularVeredicto(carrera)
-  const lineas = [
-    `${nombreCompleto} — PickNRoll`,
-    veredicto.titulo,
-    `${temporadas} temporadas · pico OVR ${picoOvr}`,
-    `🏆 ${carrera.trofeos.anillos} anillos · ⭐ ${carrera.trofeos.allStar} All-Star · 👑 ${carrera.trofeos.mvp} MVP`,
-    carrera.fase === 'nba' ? '✅ Llegó a la NBA' : '❌ Nunca pisó la NBA',
-  ]
-  return lineas.join('\n')
-}
-
 export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: PantallaRetiroProps) {
   const [copiado, setCopiado] = useState(false)
-  const texto = armarTextoCompartir(carrera, nombreCompleto)
-  const picoOvr = Math.max(0, ...carrera.historial.map((h) => h.ovr), carrera.jugador.ovr)
+  const resumen = armarResumenCarrera(carrera, nombreCompleto)
+  // El link lleva el resumen entero codificado (ver compartirCarrera.ts) — WhatsApp arma el
+  // preview con la imagen real de esta carrera (api/carrera-imagen.ts) a partir de él, sin
+  // que haga falta guardar nada en un servidor.
+  const urlCompartible = `${window.location.origin}/carrera?d=${codificarResumen(resumen)}`
+  const texto = armarTextoCompartir(resumen, urlCompartible)
+  const picoOvr = resumen.picoOvr
   const totalPj = carrera.historial.reduce((acc, h) => acc + h.pj, 0)
   const veredicto = calcularVeredicto(carrera)
   const recorrido = resumirRecorrido(carrera.historial)
 
-  async function copiar() {
+  async function compartir() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${nombreCompleto} — PickNRoll`, text: texto })
+        return
+      } catch {
+        // el usuario canceló el share nativo, o el navegador lo rechazó — cae al copiado
+      }
+    }
     try {
       await navigator.clipboard.writeText(texto)
       setCopiado(true)
@@ -151,10 +151,10 @@ export function PantallaRetiro({ carrera, nombreCompleto, onNuevaCarrera }: Pant
         <div className="mt-4 flex gap-2.5">
           <button
             type="button"
-            onClick={copiar}
+            onClick={compartir}
             className="flex-1 bg-hueso px-4 py-3.5 text-center font-titulo text-sm font-semibold tracking-[0.14em] text-fondo"
           >
-            {copiado ? 'COPIADO ✓' : 'COPIAR'}
+            {copiado ? 'COPIADO ✓' : 'COMPARTIR'}
           </button>
           <button
             type="button"

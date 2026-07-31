@@ -6,7 +6,8 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    "module": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "moduleDetection": "force",
     "noEmit": true,
 
