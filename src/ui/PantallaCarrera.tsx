@@ -331,9 +331,22 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
             <span
               key={`${carrera.historial.length}-riesgo`}
               className="animar-chip font-mono-stats text-[9px] tracking-[0.06em] sm:text-[10px]"
-              style={{ color: resultadoRiesgo.rol === 'titular' ? '#4ade80' : '#f59e0b' }}
+              style={{
+                color:
+                  resultadoRiesgo.rol === 'titular'
+                    ? '#4ade80'
+                    : resultadoRiesgo.rol === 'rotacion'
+                      ? '#f59e0b'
+                      : 'var(--color-hueso)',
+              }}
             >
-              {resultadoRiesgo.rol === 'titular' ? '● TITULAR' : '● ROTACIÓN'} · {resultadoRiesgo.titulo}
+              {/* Solo las decisiones que se pelean el puesto muestran TITULAR/ROTACIÓN; el resto
+                  (rutina, lesiones, representante) solo dice qué pasó. */}
+              {resultadoRiesgo.rol === 'titular'
+                ? `● TITULAR · ${resultadoRiesgo.titulo}`
+                : resultadoRiesgo.rol === 'rotacion'
+                  ? `● ROTACIÓN · ${resultadoRiesgo.titulo}`
+                  : `● ${resultadoRiesgo.titulo.toUpperCase()}`}
             </span>
           )}
           {resumen && (
@@ -376,7 +389,9 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
                         : 'border-hueso/15 bg-superficie-alta text-hueso/30'
                     }`}
                   >
-                    {lado === 'a' ? 'Titular' : 'Rotación'}
+                    {/* Cada decisión trae sus propios textos de revelado (ver decisionesRiesgo.ts):
+                        antes eran siempre "Titular"/"Rotación", que solo aplicaba a 3 de las 10. */}
+                    {lado === 'a' ? evento.decision.revelarExito : evento.decision.revelarFallo}
                   </div>
                 ))}
               </div>
@@ -392,18 +407,22 @@ export function PantallaCarrera({ carrera, onElegir, onContinuar }: PantallaCarr
                   <button
                     type="button"
                     onClick={competir}
-                    className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 hover:bg-superficie"
+                    className="flex flex-col items-center gap-1 border-t-4 border-acento bg-fondo px-2 py-3 text-center hover:bg-superficie"
                   >
-                    <span className="font-titulo text-sm font-semibold uppercase sm:text-base">Competir</span>
-                    <span className="font-mono-stats text-[9px] text-hueso/50">ir por la titularidad</span>
+                    <span className="font-titulo text-sm font-semibold uppercase sm:text-base">
+                      {evento.decision.opcionArriesgar}
+                    </span>
+                    <span className="font-mono-stats text-[9px] text-hueso/50">arriesgás</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onElegir('seguro')}
-                    className="flex flex-col items-center gap-1 border-t-4 border-hueso/30 bg-fondo px-2 py-3 hover:bg-superficie"
+                    className="flex flex-col items-center gap-1 border-t-4 border-hueso/30 bg-fondo px-2 py-3 text-center hover:bg-superficie"
                   >
-                    <span className="font-titulo text-sm font-semibold uppercase text-hueso/80 sm:text-base">Aceptar rotación</span>
-                    <span className="font-mono-stats text-[9px] text-hueso/50">garantizado</span>
+                    <span className="font-titulo text-sm font-semibold uppercase text-hueso/80 sm:text-base">
+                      {evento.decision.opcionSegura}
+                    </span>
+                    <span className="font-mono-stats text-[9px] text-hueso/50">sin sorpresas</span>
                   </button>
                 </div>
               </>

@@ -52,8 +52,10 @@ const OVR_INICIAL_MAX = 50
 // Probabilidad bajada (pedido explícito del usuario: "sigue muy lleno de decisiones de
 // titular/rotación y otras decisiones") — la mayoría de los turnos ahora son ofertas de
 // club simples, la competencia por el puesto es la excepción, no la mitad de las veces.
-const PROBABILIDAD_EVENTO_RIESGO_EN_NBA = 0.22
-const PROBABILIDAD_EVENTO_RIESGO_PRE_NBA = 0.2
+// Bajadas de nuevo tras el feedback del usuario ("que no sea tan seguido"): ahora hay 10
+// decisiones distintas (ver decisionesRiesgo.ts), pero aparecen menos veces.
+const PROBABILIDAD_EVENTO_RIESGO_EN_NBA = 0.15
+const PROBABILIDAD_EVENTO_RIESGO_PRE_NBA = 0.15
 
 export type ModoCaminoPreNba = 'liga-domestica' | 'universidad'
 
@@ -128,7 +130,8 @@ function conTrofeoEnUltimaTemporada(historial: EntradaHistorial[], icono: IconoT
 export interface ResultadoRiesgo {
   titulo: string
   texto: string
-  rol: Rol
+  // null cuando la decisión no toca el rol (las de impacto bajo/alto solo mueven el OVR).
+  rol: Rol | null
 }
 
 // Resumen de cómo le fue al equipo en la temporada regular NBA recién jugada, y en
@@ -345,29 +348,35 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
     return avanzarSiCorresponde(conResultadoDelTorneo, equiposNba, azar)
   }
 
-  // Decisión de riesgo — rehecha jugando Copero: NO mueve el OVR directo, cambia el ROL
-  // (titular/rotación), que después modula cuánto crecés en tu próximo fichaje (ver
-  // crecimientoPorTraspaso.ts) y tus estadísticas mientras tanto (ver estadisticas.ts).
+  // Decisión de riesgo (ver decisionesRiesgo.ts). Arriesgar mueve el OVR según el impacto de la
+  // decisión, y SOLO las que se pelean el lugar en el equipo (`afectaRol`) cambian además el rol
+  // titular/rotación — doblar turno en el gimnasio no debería sacarte del equipo.
   if (carrera.eventoPendiente.tipo === 'riesgo') {
     const decision = carrera.eventoPendiente.decision
+
     if (opcionId === 'seguro') {
       return avanzarSiCorresponde(
         {
           ...carrera,
-          rolForzado: 'rotacion',
+          rolForzado: decision.afectaRol ? 'rotacion' : carrera.rolForzado,
           eventoPendiente: null,
-          ultimoResultadoRiesgo: { titulo: decision.titulo, texto: 'Aceptaste un lugar en rotación.', rol: 'rotacion' },
+          ultimoResultadoRiesgo: {
+            titulo: decision.titulo,
+            texto: decision.afectaRol ? 'Aceptaste un lugar en rotación.' : 'Elegiste no arriesgar.',
+            // `rol: null` cuando la decisión no era sobre tu lugar en el equipo — si no, el chip
+            // de la UI diría "TITULAR" por un rol que venía de antes y no tiene que ver.
+            rol: decision.afectaRol ? 'rotacion' : null,
+          },
         },
         equiposNba,
         azar,
       )
     }
+
     if (opcionId === 'arriesgar') {
-      const rol: Rol = decision.exito ? 'titular' : 'rotacion'
-      // Además del rol, arriesgar mueve el OVR directo (pedido explícito del usuario: ganar
-      // la decisión suma puntos, perderla resta).
-      const cambio = cambioOvrPorRiesgo(decision.exito)
+      const cambio = cambioOvrPorRiesgo(decision)
       const jugador = { ...carrera.jugador, ovr: clampOvr(carrera.jugador.ovr + cambio, carrera.jugador.potencial) }
+      const rol: Rol | null = decision.afectaRol ? (decision.exito ? 'titular' : 'rotacion') : carrera.rolForzado
       return avanzarSiCorresponde(
         {
           ...carrera,
@@ -376,10 +385,8 @@ export function elegirOpcion(carrera: Carrera, opcionId: string, azar: Azar, equ
           eventoPendiente: null,
           ultimoResultadoRiesgo: {
             titulo: decision.titulo,
-            texto: decision.exito
-              ? `Ganaste la titularidad. +${cambio} de OVR.`
-              : `Perdiste terreno en el equipo. ${cambio} de OVR.`,
-            rol,
+            texto: `${decision.exito ? decision.textoExito : decision.textoFallo} ${cambio > 0 ? '+' : ''}${cambio} de OVR.`,
+            rol: decision.afectaRol ? rol : null,
           },
         },
         equiposNba,

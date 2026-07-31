@@ -8,7 +8,11 @@ import {
   type Equipo,
 } from './motorCarrera'
 import { UMBRAL_DRAFT_OVR } from './caminosPreNba'
-import { OVR_GANADO_AL_COMPETIR, OVR_PERDIDO_AL_FALLAR } from './decisionesRiesgo'
+import { CAMBIO_OVR_POR_IMPACTO, TEMAS_PARA_TESTS } from './decisionesRiesgo'
+
+// Un tema real de cada nivel de impacto, para no duplicar el contenido en los tests.
+const TEMA_MEDIO = TEMAS_PARA_TESTS.find((t) => t.impacto === 'medio')!
+const TEMA_BAJO = TEMAS_PARA_TESTS.find((t) => t.impacto === 'bajo')!
 
 const EQUIPOS_NBA: Equipo[] = [
   { id: 'a', nombre: 'A', nivel: 40 },
@@ -239,10 +243,7 @@ describe('motorCarrera', () => {
     const ovrPrevio = base.jugador.ovr
     let carrera: Carrera = {
       ...base,
-      eventoPendiente: {
-        tipo: 'riesgo',
-        decision: { titulo: 'Competencia por el puesto', descripcion: 'test', probabilidadExito: 0.5, exito: true },
-      },
+      eventoPendiente: { tipo: 'riesgo', decision: { ...TEMA_MEDIO, exito: true } },
     }
     carrera = elegirOpcion(carrera, 'seguro', azarFijo(0.99), EQUIPOS_NBA)
     expect(carrera.ultimoResultadoRiesgo?.rol).toBe('rotacion')
@@ -250,13 +251,25 @@ describe('motorCarrera', () => {
     expect(carrera.jugador.ovr).toBe(ovrPrevio)
   })
 
+  it('una decisión de impacto bajo mueve el OVR pero NO el rol (doblar turno no te saca del equipo)', () => {
+    const base = llegarANba('intensa', azarFijo(0.99))
+    const preparada: Carrera = {
+      ...base,
+      jugador: { ...base.jugador, ovr: 70, potencial: 99 },
+      ovrAlIniciarDecision: 70,
+      intervaloTemporadas: 0,
+      rolForzado: 'titular',
+      eventoPendiente: { tipo: 'riesgo', decision: { ...TEMA_BAJO, exito: false } },
+    }
+    const resultado = elegirOpcion(preparada, 'arriesgar', azarFijo(0.99), EQUIPOS_NBA)
+    expect(resultado.ultimoCambioOvr).toBe(CAMBIO_OVR_POR_IMPACTO.bajo.fallo)
+    // seguís siendo titular: la decisión no era sobre tu lugar en el equipo
+    expect(resultado.rolForzado).toBe('titular')
+  })
+
   it('en una decisión de riesgo, elegir "arriesgar" (competir) fuerza el rol según el resultado ya resuelto (titular o rotación)', () => {
     const base = llegarANba()
-    const decisionBase = {
-      titulo: 'Competencia por el puesto',
-      descripcion: 'test',
-      probabilidadExito: 0.5,
-    }
+    const decisionBase = TEMA_MEDIO
     const conEventoExito = { ...base, eventoPendiente: { tipo: 'riesgo' as const, decision: { ...decisionBase, exito: true } } }
     const conEventoFalla = { ...base, eventoPendiente: { tipo: 'riesgo' as const, decision: { ...decisionBase, exito: false } } }
     const conExito = elegirOpcion(conEventoExito, 'arriesgar', azarFijo(0.5), EQUIPOS_NBA)
@@ -468,7 +481,7 @@ describe('motorCarrera', () => {
       ovrAlIniciarDecision: 70,
       intervaloTemporadas: 0,
     }
-    const decisionBase = { titulo: 'Competencia por el puesto', descripcion: 'test', probabilidadExito: 0.5 }
+    const decisionBase = TEMA_MEDIO
 
     const ganada = elegirOpcion(
       { ...preparada, eventoPendiente: { tipo: 'riesgo', decision: { ...decisionBase, exito: true } } },
@@ -483,8 +496,8 @@ describe('motorCarrera', () => {
       EQUIPOS_NBA,
     )
 
-    expect(ganada.ultimoCambioOvr).toBe(OVR_GANADO_AL_COMPETIR)
-    expect(perdida.ultimoCambioOvr).toBe(-OVR_PERDIDO_AL_FALLAR)
+    expect(ganada.ultimoCambioOvr).toBe(CAMBIO_OVR_POR_IMPACTO.medio.exito)
+    expect(perdida.ultimoCambioOvr).toBe(CAMBIO_OVR_POR_IMPACTO.medio.fallo)
     expect(ganada.jugador.ovr).toBeGreaterThan(perdida.jugador.ovr)
   })
 
