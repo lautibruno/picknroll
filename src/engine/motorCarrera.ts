@@ -12,6 +12,7 @@ import { elegirEquiposOfrecidos, elegirTraspasoOfrecido, type Equipo } from './e
 import { generarCrecimientoPorTraspaso } from './crecimientoPorTraspaso'
 import { INTERVALO_TEMPORADAS_POR_DIFICULTAD, UMBRAL_DRAFT_OVR, type DificultadCarrera } from './caminosPreNba'
 import { LIGAS_POR_PAIS } from './datos/ligasPorPais'
+import { FALLBACK_LIGA_POR_PAIS } from './datos/fallbackLigas'
 import { EQUIPOS_CAMINO_GENERICO } from './datos/equiposCaminoGenerico'
 import { calcularEstadisticasTemporada, type EstadisticasTemporada, type Rol } from './estadisticas'
 import {
@@ -205,7 +206,12 @@ export function crearCarrera(
   const potencial = generarPotencial(azar)
   const ovr = OVR_INICIAL_MIN + Math.floor(azar() * (OVR_INICIAL_MAX - OVR_INICIAL_MIN + 1))
 
-  const ligaDomestica = LIGAS_POR_PAIS[codigoPaisNacionalidad]
+  // Si el país no tiene liga curada, cae a la liga regional/continental más fuerte (pedido
+  // explícito del usuario: "en caso de que un país no tenga liga que te mande a la liga más
+  // cercana para empezar") — ver fallbackLigas.ts. `us` y países no mapeados (código
+  // desconocido, "Otro país") siguen sin liga real: caminoGenérico (universidad/G-League).
+  const ligaDomestica =
+    LIGAS_POR_PAIS[codigoPaisNacionalidad] ?? LIGAS_POR_PAIS[FALLBACK_LIGA_POR_PAIS[codigoPaisNacionalidad]]
   const usaLigaDomestica = Boolean(ligaDomestica) && opciones.modoCaminoPreNba !== 'universidad'
   const poolPreNba = usaLigaDomestica ? ligaDomestica!.clubes : EQUIPOS_CAMINO_GENERICO
 
