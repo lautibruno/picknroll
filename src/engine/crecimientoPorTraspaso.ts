@@ -14,11 +14,11 @@ import type { Rol } from './estadisticas'
 // sentir la progresión imposible en cuanto agotabas los clubes top del pool). Ahora fichar
 // un club chico como mucho te estanca (crecimiento ~0), nunca te resta por sí solo — el
 // único lugar donde de verdad se pierde nivel es el declive de veterano (progresion.ts).
-const FACTOR_DESAFIO = 0.5
+const FACTOR_DESAFIO = 0.6
 const TOPE_DESAFIO_MIN = 0
-const TOPE_DESAFIO_MAX = 14
+const TOPE_DESAFIO_MAX = 16
 const RUIDO_MIN = 0
-const RUIDO_MAX = 3
+const RUIDO_MAX = 4
 
 // El rol forzado por la última "competencia por el puesto" (ver decisionesRiesgo.ts)
 // modula el crecimiento del PRÓXIMO fichaje/préstamo — ganaste la titularidad, llegás con

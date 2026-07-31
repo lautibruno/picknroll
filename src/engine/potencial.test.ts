@@ -8,27 +8,27 @@ function azarFijo(...valores: number[]): () => number {
 }
 
 describe('generarPotencial', () => {
-  it('cae en el tramo 62-78 (mayoría) con tirada baja', () => {
+  it('cae en el tramo 68-80 (mayoría) con tirada baja', () => {
     const potencial = generarPotencial(azarFijo(0.1, 0))
-    expect(potencial).toBeGreaterThanOrEqual(62)
-    expect(potencial).toBeLessThanOrEqual(78)
+    expect(potencial).toBeGreaterThanOrEqual(68)
+    expect(potencial).toBeLessThanOrEqual(80)
   })
 
-  it('cae en el tramo 79-87 con tirada en el segundo rango', () => {
+  it('cae en el tramo 81-88 con tirada en el segundo rango', () => {
     const potencial = generarPotencial(azarFijo(0.65, 0))
-    expect(potencial).toBeGreaterThanOrEqual(79)
-    expect(potencial).toBeLessThanOrEqual(87)
+    expect(potencial).toBeGreaterThanOrEqual(81)
+    expect(potencial).toBeLessThanOrEqual(88)
   })
 
-  it('cae en el tramo 88-93 (all-star) con tirada en el tercer rango', () => {
+  it('cae en el tramo 89-94 (all-star) con tirada en el tercer rango', () => {
     const potencial = generarPotencial(azarFijo(0.85, 0))
-    expect(potencial).toBeGreaterThanOrEqual(88)
-    expect(potencial).toBeLessThanOrEqual(93)
+    expect(potencial).toBeGreaterThanOrEqual(89)
+    expect(potencial).toBeLessThanOrEqual(94)
   })
 
-  it('cae en el tramo 94-99 (elite histórico) con tirada muy alta', () => {
+  it('cae en el tramo 95-99 (elite histórico) con tirada muy alta', () => {
     const potencial = generarPotencial(azarFijo(0.97, 0))
-    expect(potencial).toBeGreaterThanOrEqual(94)
+    expect(potencial).toBeGreaterThanOrEqual(95)
     expect(potencial).toBeLessThanOrEqual(99)
   })
 
@@ -38,22 +38,31 @@ describe('generarPotencial', () => {
     expect(alto).toBeGreaterThan(bajo)
   })
 
-  it('sobre muchas corridas, la mayoría cae en el tramo 62-78', () => {
+  it('sobre muchas corridas, la mayoría cae en el tramo más bajo (68-80)', () => {
     let contadorMayoria = 0
     const total = 2000
     for (let i = 0; i < total; i++) {
       const potencial = generarPotencial(Math.random)
-      if (potencial >= 62 && potencial <= 78) contadorMayoria++
+      if (potencial >= 68 && potencial <= 80) contadorMayoria++
     }
-    // ~50% esperado, con margen amplio para no ser flaky
-    expect(contadorMayoria / total).toBeGreaterThan(0.4)
-    expect(contadorMayoria / total).toBeLessThan(0.6)
+    // ~42% esperado, con margen amplio para no ser flaky
+    expect(contadorMayoria / total).toBeGreaterThan(0.32)
+    expect(contadorMayoria / total).toBeLessThan(0.52)
   })
 
-  it('nunca devuelve un potencial fuera de rango [62, 99]', () => {
+  it('las carreras elite siguen siendo raras (menos del 15% supera 94)', () => {
+    let elite = 0
+    const total = 2000
+    for (let i = 0; i < total; i++) {
+      if (generarPotencial(Math.random) > 94) elite++
+    }
+    expect(elite / total).toBeLessThan(0.15)
+  })
+
+  it('nunca devuelve un potencial fuera de rango [68, 99]', () => {
     for (let i = 0; i < 500; i++) {
       const potencial = generarPotencial(Math.random)
-      expect(potencial).toBeGreaterThanOrEqual(62)
+      expect(potencial).toBeGreaterThanOrEqual(68)
       expect(potencial).toBeLessThanOrEqual(99)
     }
   })
