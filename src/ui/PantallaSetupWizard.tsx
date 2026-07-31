@@ -66,7 +66,6 @@ export function PantallaSetupWizard({ onEmpezar }: PantallaSetupWizardProps) {
             manoHabil: datosPaso3.manoHabil,
             nacionalidad: codigoPais,
             modoCaminoPreNba: datosPaso1.modoCaminoPreNba,
-            dificultad: datosPaso1.dificultad,
           })
         }}
       />

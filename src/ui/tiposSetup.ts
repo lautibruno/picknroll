@@ -1,4 +1,4 @@
-import type { DificultadCarrera, ModoCaminoPreNba } from '../engine/motorCarrera'
+import type { ModoCaminoPreNba } from '../engine/motorCarrera'
 
 export interface DatosSetup {
   nombre: string
@@ -8,5 +8,4 @@ export interface DatosSetup {
   manoHabil: 'diestra' | 'zurda'
   nacionalidad: string
   modoCaminoPreNba?: ModoCaminoPreNba
-  dificultad: DificultadCarrera
 }

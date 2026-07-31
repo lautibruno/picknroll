@@ -147,7 +147,7 @@ describe('motorCarrera', () => {
   })
 
   it('al cruzar el umbral de draft (fichando un club muy por encima de tu nivel), genera el evento de Draft con equipos NBA reales', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = {
       ...carrera,
@@ -160,7 +160,7 @@ describe('motorCarrera', () => {
   })
 
   it('elegir equipo en el evento de Draft pasa la carrera a fase nba', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = conEventoDraft(carrera)
     const equipoDrafteado = opcionesDe(carrera)[0]
@@ -170,7 +170,7 @@ describe('motorCarrera', () => {
   })
 
   it('el Draft incluye la opción de quedarte en tu club/universidad actual (no te obliga a entrar)', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     const clubActualAntes = carrera.clubActual!
     carrera = {
@@ -182,7 +182,7 @@ describe('motorCarrera', () => {
   })
 
   it('elegir "quedarte" en el Draft declina — sigue en pre-nba, el Draft vuelve a aparecer después', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     const clubActualAntes = carrera.clubActual!
     carrera = {
@@ -200,11 +200,8 @@ describe('motorCarrera', () => {
   // Llega a la NBA directo (bypaseando el pool real pre-NBA, que no es lo que este helper
   // quiere probar) y deja YA lista la primera decisión post-Draft (encadenada).
   // `azarEntrada` controla ese último paso, para poder decidir en el test si toca trade o riesgo.
-  function llegarANba(
-    dificultad: 'intensa' | 'normal' | 'expres' = 'intensa',
-    azarEntrada: () => number = azarFijo(0.5),
-  ): Carrera {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad })
+  function llegarANba(azarEntrada: () => number = azarFijo(0.5)): Carrera {
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = conEventoDraft(carrera)
     carrera = elegirOpcion(carrera, 'top', azarEntrada, EQUIPOS_NBA)
@@ -215,7 +212,7 @@ describe('motorCarrera', () => {
   }
 
   it('una vez en la NBA, con azar alto toca evento de trade (no de riesgo)', () => {
-    const carrera = llegarANba('intensa', azarFijo(0.9))
+    const carrera = llegarANba(azarFijo(0.9))
     expect(carrera.eventoPendiente?.tipo).toBe('trade')
   })
 
@@ -223,7 +220,7 @@ describe('motorCarrera', () => {
   // rama (riesgo vs trade). Hace falta porque con azar bajo toda temporada NBA sale campeona, y
   // un título ahora frena la carrera antes de llegar a la próxima decisión (ver `Desenlace`).
   it('una vez en la NBA, con azar bajo toca decisión de riesgo (no trade)', () => {
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     const carrera = avanzarSiCorresponde(
       { ...base, intervaloTemporadas: 0, eventoPendiente: null },
       EQUIPOS_NBA,
@@ -233,13 +230,13 @@ describe('motorCarrera', () => {
   })
 
   it('en pre-nba con azar alto toca pase de club/universidad (no riesgo)', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.9), EQUIPOS_NBA)
     expect(carrera.eventoPendiente?.tipo).toBe('club-liga-domestica')
   })
 
   it('en una decisión de riesgo, elegir "seguro" (aceptar rotación) fuerza el rol "rotacion", no cambia el OVR directo', () => {
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     const ovrPrevio = base.jugador.ovr
     let carrera: Carrera = {
       ...base,
@@ -252,7 +249,7 @@ describe('motorCarrera', () => {
   })
 
   it('una decisión de impacto bajo mueve el OVR pero NO el rol (doblar turno no te saca del equipo)', () => {
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     const preparada: Carrera = {
       ...base,
       jugador: { ...base.jugador, ovr: 70, potencial: 99 },
@@ -278,30 +275,8 @@ describe('motorCarrera', () => {
     expect(sinExito.ultimoResultadoRiesgo?.rol).toBe('rotacion')
   })
 
-  it('con dificultad Normal, el evento en NBA tarda 2 temporadas y el historial acumula ambas', () => {
-    let carrera = llegarANba('intensa', azarFijo(0.9))
-    carrera = { ...carrera, intervaloTemporadas: 2, eventoPendiente: null, ultimoResultadoRiesgo: null }
-    const historialPrevio = carrera.historial.length
-    carrera = avanzarSiCorresponde(carrera, EQUIPOS_NBA, azarFijo(0.9))
-    expect(carrera.historial.length).toBe(historialPrevio + 2)
-    expect(carrera.eventoPendiente?.tipo).toBe('trade')
-  })
-
-  it('con dificultad Exprés, el Draft igual se dispara apenas se cruza el umbral (no espera el intervalo completo)', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'expres' })
-    carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
-    carrera = {
-      ...carrera,
-      jugador: { ...carrera.jugador, ovr: 50, potencial: 95 },
-      eventoPendiente: { tipo: 'club-liga-domestica', opciones: [{ id: 'top', nombre: 'Top Club', nivel: 95 }] },
-    }
-    carrera = elegirOpcion(carrera, 'top', azarFijo(0.5), EQUIPOS_NBA)
-    expect(carrera.eventoPendiente?.tipo).toBe('draft')
-    expect(carrera.jugador.ovr).toBeGreaterThanOrEqual(UMBRAL_DRAFT_OVR)
-  })
-
   it('se retira automáticamente a los 40 años', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     for (let i = 0; i < 40 && !carrera.retirado; i++) {
       carrera = resolverPendiente(carrera)
@@ -311,7 +286,7 @@ describe('motorCarrera', () => {
   })
 
   it('puede retirarse sin haber pisado nunca la NBA si el OVR nunca cruza el umbral', () => {
-    let carrera = crearCarrera(azarFijo(0.001), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.001), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     // Arranca ya cerca del retiro (35) con el potencial oculto igual al OVR actual — el
     // OVR no puede cruzar el umbral porque clampOvr lo tapa en el potencial, sin importar
@@ -324,8 +299,8 @@ describe('motorCarrera', () => {
     expect(carrera.fase).toBe('pre-nba')
   })
 
-  it('el historial acumula una entrada por temporada jugada (dificultad Intensa)', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+  it('el historial acumula una entrada por temporada jugada', () => {
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = { ...carrera, eventoPendiente: null }
     const historialInicial = carrera.historial.length
@@ -338,7 +313,7 @@ describe('motorCarrera', () => {
   // avanzarSiCorresponde en forma aislada (limpiando el eventoPendiente entre vueltas) para
   // no depender de la selección al azar del pool real de clubes.
   it('con posición de perímetro y azar bajo, en algún momento toca la decisión de especialización', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'PG', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'PG')
     carrera = { ...carrera, jugador: { ...carrera.jugador, edad: 21 }, eventoPendiente: null }
     let toco = false
     for (let i = 0; i < 15 && !carrera.retirado; i++) {
@@ -353,7 +328,7 @@ describe('motorCarrera', () => {
   })
 
   it('con posición de pívot (C), nunca toca la decisión de especialización', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = { ...carrera, jugador: { ...carrera.jugador, edad: 21 }, eventoPendiente: null }
     for (let i = 0; i < 15 && !carrera.retirado; i++) {
       carrera = avanzarSiCorresponde(carrera, EQUIPOS_NBA, azarFijo(0.1))
@@ -363,7 +338,7 @@ describe('motorCarrera', () => {
   })
 
   it('elegir "triplero" vs "interior" desde el mismo punto de partida cambia los triples y rebotes en direcciones opuestas', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'PG', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'PG')
     carrera = {
       ...carrera,
       jugador: { ...carrera.jugador, edad: 21 },
@@ -384,13 +359,13 @@ describe('motorCarrera', () => {
   })
 
   it('en fase NBA, entrar a un club ya deja un resumenTemporada con el récord de la temporada regular (encadenado, sin pantalla intermedia)', () => {
-    const carrera = llegarANba('intensa', azarFijo(0.99))
+    const carrera = llegarANba(azarFijo(0.99))
     expect(carrera.resumenTemporada).not.toBeNull()
     expect(carrera.resumenTemporada!.victorias + carrera.resumenTemporada!.derrotas).toBe(82)
   })
 
   it('en fase pre-nba, no se genera resumenTemporada (los playoffs son solo NBA)', () => {
-    const carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    const carrera = crearCarrera(azarFijo(0.1), 'ar', 'C')
     const conCarrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.9), EQUIPOS_NBA)
     expect(conCarrera.resumenTemporada).toBeNull()
   })
@@ -455,7 +430,7 @@ describe('motorCarrera', () => {
   })
 
   it('ultimoCambioOvr refleja el crecimiento real de fichar un club top, no un número que después no se cumple', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = {
       ...carrera,
@@ -471,7 +446,7 @@ describe('motorCarrera', () => {
   })
 
   it('arriesgar y ganar la decisión suma OVR; perderla resta (pedido explícito del usuario)', () => {
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     // potencial bien alto para que el clamp no se coma el aumento, e `intervaloTemporadas: 0`
     // para medir SOLO el efecto de la decisión (sin el crecimiento natural de las temporadas
     // que se simulan después, que también mueve el OVR).
@@ -505,7 +480,7 @@ describe('motorCarrera', () => {
     // Bug real reportado: "gané 3 títulos seguidos sin jugar, me salieron 3 carteles de campeón".
     // Pasaba porque el título cortaba el bloque de temporadas y cada "continuar" arrancaba una
     // temporada nueva, así que un equipo dominante encadenaba campeonatos sin decisiones.
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     const dominante: Carrera = {
       ...base,
       clubActual: { id: 'super', nombre: 'Super Club', nivel: 99 },
@@ -530,7 +505,7 @@ describe('motorCarrera', () => {
 
   it('en pre-nba con liga curada se puede salir campeón local, y frena la carrera para mostrarlo', () => {
     // Argentina tiene liga curada; azar bajo hace que el chequeo de título local pase.
-    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'ar', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.01), EQUIPOS_NBA)
     expect(carrera.trofeos.ligaLocal).toBe(1)
     expect(carrera.desenlacesPendientes[0]?.iconos).toEqual(['liga-local'])
@@ -541,14 +516,14 @@ describe('motorCarrera', () => {
 
   it('sin liga doméstica curada (camino genérico) nunca hay título local', () => {
     // 'us' usa el camino genérico universidad/G-League, no una liga doméstica
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     expect(carrera.ligaDomestica).toBeNull()
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.01), EQUIPOS_NBA)
     expect(carrera.trofeos.ligaLocal).toBe(0)
   })
 
   it('ganar la decisión de convocatoria otorga el Mundial y lo marca en el historial', () => {
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     // La fila del historial donde se está jugando el torneo: el Mundial se marca ahí, no en las
     // temporadas que la simulación sigue empujando después de resolver la decisión.
     const indiceTemporadaDelTorneo = base.historial.length - 1
@@ -576,7 +551,7 @@ describe('motorCarrera', () => {
   })
 
   it('perder la decisión de convocatoria no otorga nada', () => {
-    const base = llegarANba('intensa', azarFijo(0.99))
+    const base = llegarANba(azarFijo(0.99))
     const carrera = elegirOpcion(
       {
         ...base,
@@ -600,7 +575,7 @@ describe('motorCarrera', () => {
   })
 
   it('una temporada NBA con OVR de nivel All-Star marca el ícono en esa fila del historial', () => {
-    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C', { dificultad: 'intensa' })
+    let carrera = crearCarrera(azarFijo(0.1), 'us', 'C')
     carrera = elegirOpcion(carrera, opcionesDe(carrera)[0].id, azarFijo(0.5), EQUIPOS_NBA)
     carrera = {
       ...carrera,

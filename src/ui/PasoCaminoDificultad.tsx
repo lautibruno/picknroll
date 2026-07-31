@@ -1,15 +1,8 @@
 import { useState } from 'react'
-import type { DificultadCarrera, ModoCaminoPreNba } from '../engine/motorCarrera'
-
-const DIFICULTADES: { id: DificultadCarrera; nombre: string; detalle: string }[] = [
-  { id: 'intensa', nombre: 'INTENSA', detalle: 'Decisión cada temporada' },
-  { id: 'normal', nombre: 'NORMAL', detalle: 'Decisión cada 2 temporadas' },
-  { id: 'expres', nombre: 'EXPRÉS', detalle: 'Decisión cada 4 temporadas' },
-]
+import type { ModoCaminoPreNba } from '../engine/motorCarrera'
 
 export interface DatosPaso1 {
   modoCaminoPreNba: ModoCaminoPreNba
-  dificultad: DificultadCarrera
 }
 
 interface PasoCaminoDificultadProps {
@@ -18,7 +11,6 @@ interface PasoCaminoDificultadProps {
 
 export function PasoCaminoDificultad({ onContinuar }: PasoCaminoDificultadProps) {
   const [modoCaminoPreNba, setModoCaminoPreNba] = useState<ModoCaminoPreNba>('liga-domestica')
-  const [dificultad, setDificultad] = useState<DificultadCarrera>('normal')
 
   return (
     <div className="mx-auto max-w-2xl border-2 border-hueso/15 bg-fondo">
@@ -37,7 +29,7 @@ export function PasoCaminoDificultad({ onContinuar }: PasoCaminoDificultadProps)
           ESTO DEFINE DÓNDE ARRANCA TU HISTORIA
         </div>
 
-        <div className="mb-8">
+        <div className="mb-10">
           <div className="mb-2 font-mono-stats text-[9px] tracking-[0.18em] text-hueso/45">CAMINO PRE-NBA</div>
           <div className="flex flex-col gap-0.5 bg-hueso/10 sm:flex-row">
             <button
@@ -65,30 +57,9 @@ export function PasoCaminoDificultad({ onContinuar }: PasoCaminoDificultadProps)
           </div>
         </div>
 
-        <div className="mb-10">
-          <div className="mb-2 font-mono-stats text-[9px] tracking-[0.18em] text-hueso/45">VELOCIDAD DE DECISIONES</div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {DIFICULTADES.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => setDificultad(d.id)}
-                className={`flex-1 border px-3 py-3 text-left ${
-                  dificultad === d.id ? 'border-acento bg-superficie-alta' : 'border-hueso/20 bg-fondo'
-                }`}
-              >
-                <div className={`font-titulo text-sm font-semibold tracking-[0.1em] ${dificultad === d.id ? 'text-acento' : 'text-hueso'}`}>
-                  {d.nombre}
-                </div>
-                <div className="mt-0.5 font-mono-stats text-[10px] text-hueso/45">{d.detalle}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <button
           type="button"
-          onClick={() => onContinuar({ modoCaminoPreNba, dificultad })}
+          onClick={() => onContinuar({ modoCaminoPreNba })}
           className="sombra-brutal animar-glow-pulse bg-acento px-8 py-4 font-titulo text-lg font-semibold tracking-[0.16em] text-fondo"
         >
           CONTINUAR

@@ -16,7 +16,6 @@ function App() {
   function empezarCarrera(datos: DatosSetup) {
     const nueva = crearCarrera(Math.random, datos.nacionalidad, datos.posicion, {
       modoCaminoPreNba: datos.modoCaminoPreNba,
-      dificultad: datos.dificultad,
     })
     setNombreCompleto(datos.apellido)
     setCarrera(nueva)

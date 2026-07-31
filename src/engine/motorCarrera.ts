@@ -10,7 +10,7 @@ import { generarPotencial, type Azar } from './potencial'
 import { avanzarTemporada, clampOvr, type EstadoJugador } from './progresion'
 import { elegirEquiposOfrecidos, elegirTraspasoOfrecido, type Equipo } from './eventos'
 import { generarCrecimientoPorTraspaso } from './crecimientoPorTraspaso'
-import { INTERVALO_TEMPORADAS_POR_DIFICULTAD, UMBRAL_DRAFT_OVR, type DificultadCarrera } from './caminosPreNba'
+import { UMBRAL_DRAFT_OVR } from './caminosPreNba'
 import { LIGAS_POR_PAIS } from './datos/ligasPorPais'
 import { FALLBACK_LIGA_POR_PAIS } from './datos/fallbackLigas'
 import { EQUIPOS_CAMINO_GENERICO } from './datos/equiposCaminoGenerico'
@@ -43,7 +43,7 @@ import {
   type ResultadoTemporadaRegular,
 } from './playoffs'
 
-export type { Equipo, DificultadCarrera, Trofeos, DecisionRiesgo, TipoEspecializacion }
+export type { Equipo, Trofeos, DecisionRiesgo, TipoEspecializacion }
 export type { ResultadoTemporadaRegular } from './playoffs'
 
 const EDAD_INICIAL = 19
@@ -194,7 +194,6 @@ export interface OpcionesCarrera {
   // Sin especificar, usa liga doméstica si existe, o el camino genérico (universidad/
   // G-League/internacional) si no.
   modoCaminoPreNba?: ModoCaminoPreNba
-  dificultad?: DificultadCarrera
 }
 
 export function crearCarrera(
@@ -215,13 +214,13 @@ export function crearCarrera(
   const usaLigaDomestica = Boolean(ligaDomestica) && opciones.modoCaminoPreNba !== 'universidad'
   const poolPreNba = usaLigaDomestica ? ligaDomestica!.clubes : EQUIPOS_CAMINO_GENERICO
 
-  const dificultad = opciones.dificultad ?? 'normal'
-
   return {
     jugador: { ovr, edad: EDAD_INICIAL, potencial },
     nacionalidad: codigoPaisNacionalidad,
     posicion,
-    intervaloTemporadas: INTERVALO_TEMPORADAS_POR_DIFICULTAD[dificultad],
+    // Una decisión por temporada, siempre (única velocidad que tiene el juego, ver
+    // caminosPreNba.ts).
+    intervaloTemporadas: 1,
     fase: 'pre-nba',
     poolPreNba,
     clubActual: null,

@@ -25,7 +25,7 @@ type PoliticaClub = 'mejor' | 'azar'
 type PoliticaRiesgo = 'arriesgar' | 'seguro' | 'mixto'
 
 function simularCarrera(azar: () => number, club: PoliticaClub, riesgo: PoliticaRiesgo) {
-  let carrera = crearCarrera(azar, 'us', 'SG', { dificultad: 'normal' })
+  let carrera = crearCarrera(azar, 'us', 'SG')
 
   for (let paso = 0; paso < 400 && !carrera.retirado; paso++) {
     if (carrera.desenlacesPendientes.length > 0) {
