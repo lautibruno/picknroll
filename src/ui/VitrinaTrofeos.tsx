@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Carrera, IconoTrofeo } from '../engine/motorCarrera'
 import { ICONOS_TROFEO, ETIQUETA_TROFEO, DESCRIPCION_TROFEO } from './iconosTrofeos'
 
@@ -22,16 +22,47 @@ const CLAVE_TROFEO: Record<IconoTrofeo, keyof Carrera['trofeos']> = {
 
 const ORDEN: IconoTrofeo[] = ['anillo', 'mvp', 'allstar', 'mundial', 'jjoo', 'liga-local']
 
-// Se muestran TODAS las piezas ganadas (pedido explícito del usuario), superpuestas una al lado
-// de la otra. El solapamiento se adapta a la cantidad: pocas quedan separadas y aireadas, y a
-// medida que son más se van montando entre sí para que entren en el estante sin encogerse.
-// Devuelve el margen izquierdo (en px) que lleva cada pieza después de la primera.
-const SOLAPE_MAXIMO = 34
+// Ancho máximo de cada pieza (coincide con max-w-[76px] del ícono) — se usa como cota superior
+// para calcular el solapamiento, así el cálculo nunca subestima el espacio que ocupa una pieza.
+const ANCHO_PIEZA = 76
+// Cuánto puede llegar a superponerse una pieza sobre la anterior antes de recurrir a achicar
+// todo el grupo (fracción del ancho de la pieza).
+const SOLAPE_MAXIMO_FRACCION = 0.82
+// Piso de escala: por más que haya muchísimas piezas, no se reducen a algo ilegible.
+const ESCALA_MINIMA = 0.42
 
-function solapeDe(cantidad: number): number {
-  if (cantidad <= 2) return 8 // dos trofeos: separados, se lucen
-  if (cantidad === 3) return 0 // apenas tocándose
-  return Math.max(-SOLAPE_MAXIMO, -4 * (cantidad - 3))
+// Se muestran TODAS las piezas ganadas (pedido explícito del usuario: "que agrupes los trofeos
+// cuanto más son, más comprimidos, pero que no pasen el límite de la vitrina"). Antes el
+// solapamiento era un valor fijo por cantidad, sin medir el ancho real disponible — con muchas
+// piezas del mismo tipo el grupo se salía del mueble (bug real reportado con captura). Ahora se
+// mide el ancho del contenedor y se resuelve en dos pasos:
+//   1. superponer las piezas hasta un máximo (`SOLAPE_MAXIMO_FRACCION`)
+//   2. si con esa superposición todavía no entra, escalar el grupo entero hacia abajo
+// así SIEMPRE cabe dentro del ancho disponible, sea cual sea la cantidad.
+function calcularAjuste(cantidad: number, anchoDisponible: number): { margenIzq: number; escala: number } {
+  if (cantidad <= 1 || anchoDisponible <= 0) return { margenIzq: 0, escala: 1 }
+
+  const anchoSinSolapar = ANCHO_PIEZA * cantidad
+  if (anchoSinSolapar <= anchoDisponible) {
+    // Entra holgado: separadas si son pocas, apenas tocándose si son varias.
+    const margen = cantidad <= 2 ? 8 : cantidad === 3 ? 0 : Math.max(-34, -4 * (cantidad - 3))
+    return { margenIzq: margen, escala: 1 }
+  }
+
+  // No entra sin superponerse: calculamos el solape exacto que hace falta para que quepa.
+  const margenNecesario = (anchoDisponible - anchoSinSolapar) / (cantidad - 1)
+  const margenMaximo = -ANCHO_PIEZA * SOLAPE_MAXIMO_FRACCION
+  const margenAplicado = Math.max(margenMaximo, margenNecesario)
+
+  if (margenNecesario >= margenMaximo) {
+    // El solape máximo alcanza para entrar.
+    return { margenIzq: margenAplicado, escala: 1 }
+  }
+
+  // Ni el solape máximo alcanza (muchísimas piezas): además hay que escalar el grupo entero.
+  const anchoConSolapeMaximo = ANCHO_PIEZA + (cantidad - 1) * (ANCHO_PIEZA + margenAplicado)
+  const escala = Math.max(ESCALA_MINIMA, anchoDisponible / anchoConSolapeMaximo)
+  return { margenIzq: margenAplicado, escala }
 }
 
 interface Grupo {
@@ -99,7 +130,11 @@ export function VitrinaTrofeos({ carrera }: VitrinaTrofeosProps) {
               >
                 {estantes.map((grupsEstante, indiceEstante) => (
                   <div key={indiceEstante} className="relative">
-                    <div className="relative flex h-[120px] items-end justify-evenly gap-2 px-4 pb-0.5 sm:h-[132px] sm:px-6">
+                    {/* Cada grupo mide en flex-1/min-w-0: así se reparte el ancho real del
+                        estante entre todos los grupos que lo comparten, en vez de dejar que
+                        cada uno crezca a su ancho natural (eso era lo que permitía que un
+                        grupo con muchas piezas se saliera del mueble). */}
+                    <div className="relative flex h-[120px] items-end gap-2 px-4 pb-0.5 sm:h-[132px] sm:px-6">
                       {grupsEstante.map((grupo, indiceGrupo) => (
                         <GrupoDeTrofeos
                           key={grupo.icono}
@@ -182,30 +217,56 @@ function GrupoDeTrofeos({
 }) {
   const Icono = ICONOS_TROFEO[grupo.icono]
   const etiqueta = ETIQUETA_TROFEO[grupo.icono]
-  const solape = solapeDe(grupo.cantidad)
+
+  // Mide el ancho real de su propio slot (ya repartido por flex-1 entre los grupos del mismo
+  // estante) para calcular cuánto tienen que superponerse/achicarse las piezas y que NUNCA se
+  // salgan del mueble, sea cual sea la cantidad.
+  const contenedorRef = useRef<HTMLButtonElement>(null)
+  const [anchoDisponible, setAnchoDisponible] = useState(0)
+  useEffect(() => {
+    const el = contenedorRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entradas) => {
+      const ancho = entradas[0]?.contentRect.width
+      if (ancho) setAnchoDisponible(ancho)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const { margenIzq, escala } = calcularAjuste(grupo.cantidad, anchoDisponible)
 
   return (
     <button
+      ref={contenedorRef}
       type="button"
       onClick={onTocar}
       title={etiqueta}
       aria-label={`${etiqueta}: ${grupo.cantidad}`}
       // `items-end` + sin nada debajo de las piezas: así quedan APOYADAS en la tabla del
       // estante en vez de flotando (el contador va como badge absoluto, no en el flujo).
-      className="group relative flex max-w-full cursor-pointer items-end bg-transparent pb-0"
+      // `flex-1 min-w-0` reparte el ancho del estante entre todos los grupos que lo comparten.
+      // El `overflow-hidden` va en el contenedor de las PIEZAS, no en el botón entero, para no
+      // recortar el badge "×N" (que sí necesita poder asomar un poco por arriba/afuera).
+      className="group relative flex min-w-0 flex-1 cursor-pointer items-end justify-center bg-transparent pb-0"
     >
-      {Array.from({ length: grupo.cantidad }, (_, i) => (
-        <span
-          key={i}
-          className="animar-trofeo relative block shrink-0"
-          style={{
-            animationDelay: `${retraso + i * 70}ms`,
-            transformOrigin: 'bottom center',
-            marginLeft: i === 0 ? 0 : `${solape}px`,
-            // Las de adelante tapan a las de atrás, como trofeos apoyados en fila
-            zIndex: i,
-          }}
+      <div className="flex w-full items-end justify-center overflow-hidden">
+        <div
+          className="flex items-end"
+          style={{ transform: escala < 1 ? `scale(${escala})` : undefined, transformOrigin: 'bottom center' }}
         >
+        {Array.from({ length: grupo.cantidad }, (_, i) => (
+          <span
+            key={i}
+            className="animar-trofeo relative block shrink-0"
+            style={{
+              animationDelay: `${retraso + i * 70}ms`,
+              transformOrigin: 'bottom center',
+              marginLeft: i === 0 ? 0 : `${margenIzq}px`,
+              // Las de adelante tapan a las de atrás, como trofeos apoyados en fila
+              zIndex: i,
+            }}
+          >
           {/* Foco de luz del estante — sin esto, un trofeo/logo oscuro desaparece contra el
               fondo negro del mueble (pasó de verdad con el logo de la LNB al verificar). */}
           <span
@@ -234,8 +295,10 @@ function GrupoDeTrofeos({
           )}
           {/* Sombra de la pieza apoyada en el estante */}
           <span className="absolute bottom-0 left-1/2 h-[4px] w-7 -translate-x-1/2 rounded-[50%] bg-black/70" />
-        </span>
-      ))}
+          </span>
+          ))}
+        </div>
+      </div>
       {grupo.cantidad > 1 && (
         <span
           className={`absolute -top-1 right-0 px-1 font-mono-stats text-[9px] leading-none transition-colors ${
